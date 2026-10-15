@@ -1,9 +1,28 @@
-from urllib.parse import urlencode
+import asyncio
+import json
+import os
+import re
+import xml.etree.ElementTree as ET
+from html import unescape
+from typing import Dict, List, Optional, Union
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
+import httpx
+
+from youtubesearchpython.core.componenthandler import (
+    ComponentHandler,
+    getValue,
+    getVideoId,
+)
 from youtubesearchpython.core.constants import *
-from youtubesearchpython.core.requests import RequestCore
-from youtubesearchpython.core.componenthandler import getValue
-from youtubesearchpython.core.requests import YouTubeRequestError
+from youtubesearchpython.core.requests import (
+    RequestCore,
+    YouTubeParseError,
+    YouTubeRequestError,
+    apply_cookies_to_client,
+    cleanup_cookie_file,
+    resolve_cookie_file_ex,
+)
 from youtubesearchpython.core.utils import normalize_thumbnails
 
 
@@ -166,15 +185,6 @@ class ChannelCore(RequestCore):
     def sync_create(self):
         self.prepare_request()
         self.parse_response(self._json(self.syncPostRequest()))
-
-
-import json
-from typing import Union
-
-from youtubesearchpython.core.componenthandler import getVideoId, getValue
-from youtubesearchpython.core.constants import *
-from youtubesearchpython.core.requests import RequestCore
-from youtubesearchpython.core.requests import YouTubeRequestError
 
 
 class CommentsCore(RequestCore):
@@ -441,15 +451,6 @@ class CommentsCore(RequestCore):
             return json.dumps(self.commentsComponent, indent=4)
 
 
-import json
-from typing import Union
-
-from youtubesearchpython.core.constants import *
-from youtubesearchpython.core.componenthandler import ComponentHandler
-from youtubesearchpython.core.requests import RequestCore
-from youtubesearchpython.core.requests import YouTubeRequestError, YouTubeParseError
-
-
 class HashtagCore(RequestCore, ComponentHandler):
     def __init__(self, hashtag: str, limit: int = 60, language: str = "en", region: str = "US", timeout: int = None):
         RequestCore.__init__(self, timeout=timeout)
@@ -609,17 +610,6 @@ class HashtagCore(RequestCore, ComponentHandler):
             
 
 
-import os
-import json
-import re
-from typing import Union
-from urllib.parse import urlencode
-
-from youtubesearchpython.core.constants import ResultMode
-from youtubesearchpython.core.requests import YouTubeParseError, YouTubeRequestError
-from youtubesearchpython.core.requests import RequestCore
-
-
 class SuggestionsCore(RequestCore):
     def __init__(self, language: str = 'en', region: str = 'US', timeout: int = None):
         super().__init__(timeout=timeout)
@@ -698,26 +688,6 @@ class SuggestionsCore(RequestCore):
         if request.status_code != 200:
             raise YouTubeRequestError(f"Invalid status code {request.status_code} for suggestions request")
         self.response = request.text
-
-
-import re
-import json
-import asyncio
-import xml.etree.ElementTree as ET
-from html import unescape
-from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
-from typing import Dict, List, Optional
-
-import httpx
-
-from youtubesearchpython.core.requests import RequestCore
-from youtubesearchpython.core.constants import userAgent
-from youtubesearchpython.core.componenthandler import getVideoId
-from youtubesearchpython.core.requests import (
-    resolve_cookie_file_ex,
-    cleanup_cookie_file,
-    apply_cookies_to_client,
-)
 
 
 class TranscriptCore(RequestCore):

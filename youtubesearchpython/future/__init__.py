@@ -1,8 +1,25 @@
-from typing import Any, Dict, Optional
+import copy
+import sys as _sys
+from typing import Any, Dict, Optional, Union
 
-from youtubesearchpython.core.search import ChannelSearchCore
+from youtubesearchpython.attestation import BotGuard
 from youtubesearchpython.core.constants import *
-from youtubesearchpython.core.search import SearchCore
+from youtubesearchpython.core.playlist import PlaylistCore
+from youtubesearchpython.core.requests import aclose_clients, close_clients
+from youtubesearchpython.core.search import ChannelSearchCore, SearchCore
+from youtubesearchpython.core.social import (
+    ChannelCore,
+    CommentsCore,
+    HashtagCore,
+    SuggestionsCore,
+    TranscriptCore,
+)
+from youtubesearchpython.core.utils import *
+from youtubesearchpython.core.video import (
+    RecommendationsCore,
+    StreamURLFetcherCore,
+    VideoCore,
+)
 
 
 class Search(SearchCore):
@@ -120,20 +137,6 @@ class CustomSearch(SearchCore):
 
     async def next(self) -> Dict[str, Any]:
         return await self._nextAsync()
-
-
-import copy
-from typing import Union
-
-from youtubesearchpython.core import VideoCore
-from youtubesearchpython.core.social import CommentsCore
-from youtubesearchpython.core.constants import ResultMode, ChannelRequestType
-from youtubesearchpython.core.social import HashtagCore
-from youtubesearchpython.core.playlist import PlaylistCore
-from youtubesearchpython.core.social import SuggestionsCore
-from youtubesearchpython.core.social import TranscriptCore
-from youtubesearchpython.core.social import ChannelCore
-from youtubesearchpython.core.video import RecommendationsCore
 
 
 class Video:
@@ -338,11 +341,6 @@ class Recommendations:
         return recommendations_core.resultComponents        
 
 
-from typing import Optional, Union
-
-from youtubesearchpython.core.video import StreamURLFetcherCore
-
-
 class StreamURLFetcher(StreamURLFetcherCore):
     def __init__(self, proxy: str = None, cookies_file: str = None, po_token: str = None, visitor_data: str = None):
         super().__init__(proxy, cookies_file, po_token, visitor_data)
@@ -366,15 +364,10 @@ class StreamURLFetcher(StreamURLFetcherCore):
         return {"streams": self._streams, "unresolved": self.unresolved()}
 
 
-from youtubesearchpython.core.utils import *
-from youtubesearchpython.core.constants import *
-from youtubesearchpython.core.requests import aclose_clients, close_clients
-
 __title__='yt-search-python'
-__version__='2.2.1'
+__version__='2.2.2'
 __author__='Prakhar-Shukla'
 __license__='MIT'
-__all__=['Search','VideosSearch','ChannelsSearch','PlaylistsSearch','CustomSearch','ChannelSearch','Video','Playlist','Suggestions','SuggestionsSession','Hashtag','Comments','Transcript','Channel','Recommendations','StreamURLFetcher','aclose_clients','close_clients','ResultMode','SearchMode','VideoUploadDateFilter','VideoDurationFilter','VideoSortOrder','ChannelRequestType','playlist_from_channel_id']
-import sys as _sys
+__all__=['Search','VideosSearch','ChannelsSearch','PlaylistsSearch','CustomSearch','ChannelSearch','Video','Playlist','Suggestions','SuggestionsSession','Hashtag','Comments','Transcript','Channel','Recommendations','StreamURLFetcher','BotGuard','aclose_clients','close_clients','ResultMode','SearchMode','VideoUploadDateFilter','VideoDurationFilter','VideoSortOrder','ChannelRequestType','playlist_from_channel_id']
 for _name in ('search','extras','streamurlfetcher'):
     _sys.modules[f'{__name__}.{_name}']=_sys.modules[__name__]

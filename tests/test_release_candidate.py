@@ -8,14 +8,19 @@ from unittest.mock import patch
 
 import httpx
 import psutil
+from youtubesearchpython.future.search import VideosSearch as AsyncVideosSearch
+from youtubesearchpython.search import VideosSearch
 
+from youtubesearchpython.core.componenthandler import getValue
 from youtubesearchpython.core.constants import ResultMode, SearchMode
 from youtubesearchpython.core.playlist import PlaylistCore
-from youtubesearchpython.core.componenthandler import getValue
 from youtubesearchpython.core.requests import RequestCore, aclose_clients, close_clients
-from youtubesearchpython.core.utils import get_cleaned_url, get_playlist_id, get_video_id, normalize_thumbnails
-from youtubesearchpython.search import VideosSearch
-from youtubesearchpython.future.search import VideosSearch as AsyncVideosSearch
+from youtubesearchpython.core.utils import (
+    get_cleaned_url,
+    get_playlist_id,
+    get_video_id,
+    normalize_thumbnails,
+)
 
 
 def test_get_value_supports_negative_indices():
@@ -257,10 +262,42 @@ def test_normal_playlist_browse_and_continuation_dedup():
     assert [v['id'] for v in core.result['videos']] == ['pnxL4OOzPEc', 'abcdefghijk']
 
 
+def test_playlist_current_lockup_shape_extracts_videos():
+    core = PlaylistCore('PL1234567890', None, ResultMode.dict, None)
+    core.responseSource = {
+        "contents": [{"lockupViewModel": {
+            "contentType": "LOCKUP_CONTENT_TYPE_VIDEO",
+            "contentId": "abcdefghijk",
+            "contentImage": {"thumbnailViewModel": {
+                "image": {"sources": [{"url": "https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg"}]},
+                "overlays": [{"thumbnailBottomOverlayViewModel": {"badges": [{"thumbnailBadgeViewModel": {
+                    "text": "3:42",
+                    "rendererContext": {"accessibilityContext": {"label": "3 minutes, 42 seconds"}},
+                }}]}}],
+            }},
+            "metadata": {"lockupMetadataViewModel": {
+                "title": {"content": "Example"},
+                "metadata": {"contentMetadataViewModel": {"metadataRows": [{"metadataParts": [{"text": {
+                    "content": "Channel",
+                    "commandRuns": [{"onTap": {"innertubeCommand": {"browseEndpoint": {"browseId": "UC123"}}}}],
+                }}]}]}},
+            }},
+        }}],
+        "sidebar": {"playlistSidebarRenderer": {"items": []}},
+    }
+
+    core._process(first=True)
+
+    assert core.result["videos"][0]["id"] == "abcdefghijk"
+    assert core.result["videos"][0]["duration"] == "3:42"
+    assert core.result["videos"][0]["channel"]["id"] == "UC123"
+
+
 def test_request_timeout_defaults_are_not_overwritten():
-    from youtubesearchpython.core.search import SearchCore
     from youtubesearchpython.core.channelsearch import ChannelSearchCore
     from youtubesearchpython.core.suggestions import SuggestionsCore
+
+    from youtubesearchpython.core.search import SearchCore
     from youtubesearchpython.core.video import VideoCore
     assert SearchCore('x', 1, 'en', 'US', SearchMode.videos, None).timeout == 10
     assert ChannelSearchCore('x', 'en', 'US', '', 'UC1', None).timeout == 10
@@ -333,9 +370,10 @@ def test_cookie_cleanup_respects_ownership(tmp_path):
 
 def test_public_versions_and_live_signature():
     import inspect
+
     import youtubesearchpython as sync_api
     import youtubesearchpython.future as async_api
-    assert sync_api.__version__ == async_api.__version__ == '2.2.1'
+    assert sync_api.__version__ == async_api.__version__ == '2.2.2'
     assert 'is_live' in inspect.signature(sync_api.VideosSearch).parameters
     assert 'is_live' in inspect.signature(async_api.VideosSearch).parameters
     assert callable(sync_api.close_clients)
@@ -441,6 +479,7 @@ def test_async_hashtag_stops_after_exhaustion_without_refetch():
 
 def test_stream_fetcher_has_no_ytdlp_dependency_and_preserves_direct_urls():
     from urllib.parse import parse_qs, urlsplit
+
     from youtubesearchpython.streamurlfetcher import StreamURLFetcher
     data = {
         'id': 'pnxL4OOzPEc',
@@ -462,9 +501,12 @@ def test_stream_fetcher_has_no_ytdlp_dependency_and_preserves_direct_urls():
 
 
 def test_video_player_request_supports_po_token_and_visitor_data():
-    from youtubesearchpython.core.video import VideoCore
     from youtubesearchpython.core.constants import ResultMode
+    from youtubesearchpython.core.video import VideoCore
     core = VideoCore('pnxL4OOzPEc', 'getFormats', ResultMode.dict, 3, False, po_token='pot123', visitor_data='visitor123')
+    core.prepare_innertube_request()
+    assert 'serviceIntegrityDimensions' not in core.data
+    core.overridedClient = 'WEB'
     core.prepare_innertube_request()
     assert core.data['serviceIntegrityDimensions']['poToken'] == 'pot123'
     assert core.data['context']['client']['visitorData'] == 'visitor123'
@@ -514,6 +556,20 @@ def test_channel_search_continuation_uses_token_and_does_not_repeat_first_reques
     assert 'browseId' not in core.data
 
 
+def test_channel_search_discovers_current_search_params():
+    from youtubesearchpython.core.search import ChannelSearchCore
+
+    payload = {"contents": {"twoColumnBrowseResultsRenderer": {"tabs": [
+        {"tabRenderer": {"title": "Videos"}},
+        {"expandableTabRenderer": {
+            "title": "Search",
+            "endpoint": {"browseEndpoint": {"params": "CURRENT_SEARCH_PARAMS"}},
+        }},
+    ]}}}
+
+    assert ChannelSearchCore._search_params(payload) == "CURRENT_SEARCH_PARAMS"
+
+
 def test_rd_real_shape_preserves_order_and_ignores_comment_continuations():
     core = PlaylistCore('RDpnxL4OOzPEc', None, ResultMode.dict, 10)
     def panel(video_id, title, selected=False):
@@ -541,8 +597,8 @@ def test_rd_real_shape_preserves_order_and_ignores_comment_continuations():
 
 
 def test_search_skips_malformed_rich_items():
-    from youtubesearchpython.core.search import SearchCore
     from youtubesearchpython.core.constants import richItemKey
+    from youtubesearchpython.core.search import SearchCore
     core = SearchCore('x', 5, 'en', 'US', SearchMode.videos, 1)
     core.responseSource = [{richItemKey: {'content': None}}]
     core._getComponents(True, False, False)
@@ -551,6 +607,7 @@ def test_search_skips_malformed_rich_items():
 
 def test_hashtag_last_nonempty_page_clears_stale_continuation():
     from youtubesearchpython.core.hashtag import HashtagCore
+
     from youtubesearchpython.core.constants import richItemKey, videoElementKey
     core = HashtagCore('x', 5, 'en', 'US', 1)
     core.continuationKey = 'OLD'
@@ -562,8 +619,8 @@ def test_hashtag_last_nonempty_page_clears_stale_continuation():
 
 
 def test_suggestions_non_200_raises_request_error():
-    from youtubesearchpython.core.suggestions import SuggestionsCore
     from youtubesearchpython.core.exceptions import YouTubeRequestError
+    from youtubesearchpython.core.suggestions import SuggestionsCore
     class Response:
         status_code = 503
         text = 'down'
@@ -579,6 +636,7 @@ def test_suggestions_non_200_raises_request_error():
 
 def test_channel_continuation_keeps_items_after_token_and_dedupes():
     from youtubesearchpython.core.channel import ChannelCore
+
     from youtubesearchpython.core.constants import ChannelRequestType
     core = ChannelCore('UC1', ChannelRequestType.playlists)
     core.result = {'playlists': [{'id': 'PL1'}]}
@@ -762,8 +820,9 @@ def test_video_html_date_request_failure_is_non_fatal_sync_and_async():
 def test_env_po_token_fallback(monkeypatch):
     monkeypatch.setenv("YT_PO_TOKEN", "env-pot")
     monkeypatch.setenv("YT_VISITOR_DATA", "env-visitor")
-    from youtubesearchpython.core.video import VideoCore
     from youtubesearchpython.core.streamurlfetcher import StreamURLFetcherCore
+
+    from youtubesearchpython.core.video import VideoCore
     v=VideoCore("pnxL4OOzPEc", "getFormats", 1, None, False)
     s=StreamURLFetcherCore()
     assert (v.po_token, v.visitor_data)==("env-pot", "env-visitor")
@@ -779,7 +838,11 @@ def test_explicit_po_token_beats_env(monkeypatch):
 
 
 def test_legacy_componenthandler_import_path_preserved():
-    from youtubesearchpython.handlers.componenthandler import ComponentHandler, getValue, getVideoId
+    from youtubesearchpython.handlers.componenthandler import (
+        ComponentHandler,
+        getValue,
+        getVideoId,
+    )
     assert ComponentHandler is not None
     assert getValue({"a":{"b":1}}, ["a","b"]) == 1
     assert getVideoId("https://youtu.be/pnxL4OOzPEc") == "pnxL4OOzPEc"
@@ -793,7 +856,10 @@ def test_explicit_empty_auth_disables_env(monkeypatch):
 
 
 def test_cookie_helpers_are_runtime_complete(tmp_path, monkeypatch):
-    from youtubesearchpython.core.requests import apply_cookies_to_client, resolve_cookie_file_ex
+    from youtubesearchpython.core.requests import (
+        apply_cookies_to_client,
+        resolve_cookie_file_ex,
+    )
     cookie_file = tmp_path / "cookies.txt"
     cookie_file.write_text("# Netscape HTTP Cookie File\n.example.com\tTRUE\t/\tFALSE\t0\ttest\tvalue\n")
     monkeypatch.setenv("YOUTUBE_COOKIES_FILE", str(cookie_file))
@@ -835,6 +901,7 @@ def test_simultaneous_event_loops_do_not_close_each_other():
 
 def test_sync_and_future_public_search_exports_remain_compatible():
     import inspect
+
     import youtubesearchpython as sync_api
     import youtubesearchpython.future as async_api
 
@@ -855,3 +922,132 @@ def test_sync_and_future_public_search_exports_remain_compatible():
     assert inspect.iscoroutinefunction(async_api.Playlist.get)
     assert inspect.iscoroutinefunction(async_api.Recommendations.get)
     assert inspect.iscoroutinefunction(async_api.StreamURLFetcher.get)
+
+
+def test_legacy_search_initializes_transport_state():
+    from youtubesearchpython.legacy import LegacySearchInternal
+
+    legacy = LegacySearchInternal("query", 1, "dict", 3, "en", "US")
+
+    assert legacy.headers is None
+    assert legacy.proxy is None
+    assert legacy.timeout == 10
+
+
+def test_legacy_playlist_lockup_preserves_result_shape():
+    from youtubesearchpython.legacy import LegacySearchInternal
+
+    legacy = LegacySearchInternal("query", 1, "dict", 3, "en", "US")
+    result = legacy._getLegacyLockupComponent({
+        "lockupViewModel": {
+            "contentType": "LOCKUP_CONTENT_TYPE_PLAYLIST",
+            "contentId": "PL123",
+            "metadata": {"lockupMetadataViewModel": {"title": {"content": "Playlist"}}},
+            "contentImage": {"collectionThumbnailViewModel": {"primaryThumbnail": {"thumbnailViewModel": {"image": {"sources": [{"url": "https://example.com/thumb.jpg"}]}}}}},
+        }
+    }, "playlist")
+
+    assert result == {
+        "index": 0,
+        "id": "PL123",
+        "link": "https://www.youtube.com/playlist?list=PL123",
+        "title": "Playlist",
+        "thumbnails": ["https://example.com/thumb.jpg"],
+        "count": None,
+        "channel": None,
+    }
+
+
+def test_recommendation_lockup_extracts_duration_and_metadata():
+    lockup = {
+        "contentType": "LOCKUP_CONTENT_TYPE_VIDEO",
+        "contentId": "abcdefghijk",
+        "contentImage": {
+            "thumbnailViewModel": {
+                "image": {"sources": [{"url": "https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg"}]},
+                "overlays": [{
+                    "thumbnailBottomOverlayViewModel": {
+                        "badges": [{
+                            "thumbnailBadgeViewModel": {
+                                "text": "3:42",
+                                "rendererContext": {"accessibilityContext": {"label": "3 minutes, 42 seconds"}},
+                            }
+                        }]
+                    }
+                }],
+            }
+        },
+        "metadata": {
+            "lockupMetadataViewModel": {
+                "title": {"content": "Example video"},
+                "metadata": {
+                    "contentMetadataViewModel": {
+                        "metadataRows": [
+                            {"metadataParts": [{"text": {
+                                "content": "Example channel",
+                                "commandRuns": [{"onTap": {"innertubeCommand": {"browseEndpoint": {"browseId": "UC123"}}}}],
+                            }}]},
+                            {"metadataParts": [
+                                {"text": {"content": "12K", "accessibilityLabel": "12 thousand views", "leadingIcon": {"name": "PLAY_ARROW_OUTLINED"}}},
+                                {"text": {"content": "2 days ago"}},
+                            ]},
+                        ]
+                    }
+                },
+            }
+        },
+    }
+
+    from youtubesearchpython.core.video import RecommendationsCore
+
+    result = RecommendationsCore("sourcevideo")._getRecommendationLockup(lockup)
+
+    assert result["duration"] == "3:42"
+    assert result["accessibility"]["duration"] == "3 minutes, 42 seconds"
+    assert result["channel"]["id"] == "UC123"
+    assert result["viewCount"]["short"] == "12K"
+    assert result["publishedTime"] == "2 days ago"
+
+
+def test_player_profile_sets_matching_headers_and_clean_payload():
+    from youtubesearchpython.core.video import VideoCore
+
+    core = VideoCore("dQw4w9WgXcQ", "getFormats", ResultMode.dict, 10, False, overridedClient="ANDROID_VR")
+    core.prepare_innertube_request()
+
+    client = core.data["context"]["client"]
+    assert client["clientName"] == "ANDROID_VR"
+    assert core.headers["X-YouTube-Client-Name"] == "93"
+    assert core.headers["X-YouTube-Client-Version"] == client["clientVersion"]
+    assert "api_key" not in core.data
+
+    core.po_token = "web-token"
+    core.prepare_innertube_request()
+    assert "serviceIntegrityDimensions" not in core.data
+
+    core.overridedClient = "WEB"
+    core.prepare_innertube_request()
+    assert core.data["serviceIntegrityDimensions"] == {"poToken": "web-token"}
+
+
+def test_botguard_public_imports_and_provider_bridge(monkeypatch):
+    from types import SimpleNamespace
+
+    import youtubesearchpython as sync_api
+    import youtubesearchpython.future as async_api
+
+    class Provider:
+        def __init__(self, **options):
+            self.options = options
+
+        def get(self, video_id):
+            return SimpleNamespace(token=f"sync-{video_id}")
+
+        async def aget(self, video_id):
+            return SimpleNamespace(token=f"async-{video_id}")
+
+    monkeypatch.setattr("ytsp_po_provider.POTokenProvider", Provider)
+
+    assert sync_api.BotGuard is async_api.BotGuard
+    assert sync_api.BotGuard.generate("abcdefghijk", timeout=5) == "sync-abcdefghijk"
+    assert asyncio.run(async_api.BotGuard.agenerate("abcdefghijk", timeout=5)) == "async-abcdefghijk"

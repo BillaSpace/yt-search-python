@@ -15,7 +15,7 @@
   </a>
 </p>
 
-# yt-search-python v2.2.1
+# yt-search-python v2.2.2
 
 Search YouTube videos, playlists, channels, comments, transcripts, recommendations, suggestions, and stream metadata without the YouTube Data API v3.
 
@@ -85,6 +85,24 @@ formats = Video.getFormats(
 ```
 
 `ResultMode.dict` and `ResultMode.json` are supported by video APIs.
+
+## BotGuard PO tokens
+
+The existing imports and explicit `po_token` arguments remain supported. Optional local BotGuard generation is available through the companion provider:
+
+```bash
+pip install 'yt-search-python[botguard]'
+```
+
+```python
+from youtubesearchpython import BotGuard, Video
+
+video_id = "pnxL4OOzPEc"
+po_token = BotGuard.generate(video_id)
+formats = Video.getFormats(video_id, po_token=po_token)
+```
+
+The async namespace exposes the same `BotGuard` class and `await BotGuard.agenerate(video_id)`.
 
 ## StreamURLFetcher
 

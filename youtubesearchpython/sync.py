@@ -1,7 +1,20 @@
-from typing import Optional
+from typing import Optional, Union
+
 from youtubesearchpython.core.constants import *
-from youtubesearchpython.core.search import SearchCore
-from youtubesearchpython.core.search import ChannelSearchCore
+from youtubesearchpython.core.playlist import PlaylistCore
+from youtubesearchpython.core.search import ChannelSearchCore, SearchCore
+from youtubesearchpython.core.social import (
+    ChannelCore,
+    CommentsCore,
+    HashtagCore,
+    SuggestionsCore,
+    TranscriptCore,
+)
+from youtubesearchpython.core.video import (
+    RecommendationsCore,
+    StreamURLFetcherCore,
+    VideoCore,
+)
 
 
 class Search(SearchCore):
@@ -139,19 +152,6 @@ class CustomSearch(SearchCore):
     
     def next(self):
         return self._next()
-
-
-from typing import Union
-
-from youtubesearchpython.core.social import ChannelCore
-from youtubesearchpython.core.social import CommentsCore
-from youtubesearchpython.core.constants import *
-from youtubesearchpython.core.social import HashtagCore
-from youtubesearchpython.core.playlist import PlaylistCore
-from youtubesearchpython.core.video import RecommendationsCore
-from youtubesearchpython.core.social import SuggestionsCore
-from youtubesearchpython.core.social import TranscriptCore
-from youtubesearchpython.core.video import VideoCore
 
 
 class Video:
@@ -366,11 +366,6 @@ class Recommendations:
         recommendationsInternal.sync_create()
         return recommendationsInternal.resultComponents
             
-
-
-from typing import Optional, Union
-
-from youtubesearchpython.core.video import StreamURLFetcherCore
 
 
 class StreamURLFetcher(StreamURLFetcherCore):

@@ -1,9 +1,14 @@
 import json
+import sys as _sys
 
+from youtubesearchpython.core import componenthandler as _componenthandler
 from youtubesearchpython.core.componenthandler import ComponentHandler
 from youtubesearchpython.core.constants import *
-from youtubesearchpython.core.requests import YouTubeRequestError, YouTubeParseError
-from youtubesearchpython.core.requests import RequestCore
+from youtubesearchpython.core.requests import (
+    RequestCore,
+    YouTubeParseError,
+    YouTubeRequestError,
+)
 
 
 class RequestHandler(RequestCore, ComponentHandler):
@@ -59,8 +64,5 @@ class RequestHandler(RequestCore, ComponentHandler):
             
 
 
-from youtubesearchpython.core.componenthandler import ComponentHandler, getValue, getVideoId
-import sys as _sys
-from youtubesearchpython.core import componenthandler as _componenthandler
 _sys.modules[f'{__name__}.componenthandler']=_componenthandler
 _sys.modules[f'{__name__}.requesthandler']=_sys.modules[__name__]

@@ -1,11 +1,12 @@
-import setuptools
 from pathlib import Path
+
+import setuptools
 
 long_description=Path("README.md").read_text(encoding="utf-8")
 
 setuptools.setup(
     name="yt-search-python",
-    version="2.2.1",
+    version="2.2.2",
     author="Prakhar-Shukla",
     license="MIT",
     author_email="srvopus@gmail.com",
@@ -20,6 +21,9 @@ setuptools.setup(
         "httpx>=0.28.1,<1.0"
     ],
     extras_require={
+        "botguard":[
+            "ytsp-po-token-provider>=0.2.0"
+        ],
         "transcript":[
             'yt-dlp; python_version >= "3.10"'
         ]

@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.2] - Unreleased
+
+- Restored live streaming-format retrieval with current, internally consistent Innertube client profiles.
+- Preserved all sync, async, and legacy import paths while fixing legacy transport initialization.
+- Parsed durations and metadata from the current recommendation lockup response shape.
+- Added optional BotGuard-backed PO-token integration through the companion provider.
+
 ## [2.2.1] - 2026-08-14
 
 ### HTTP and resource lifecycle
@@ -56,7 +63,7 @@
 - Improved channel playlist pagination order and stable duplicate handling.
 
 ### Packaging and compatibility
-- Package version is `2.2.1` in sync/async namespaces and build metadata.
+- Package version is consistent in sync/async namespaces and build metadata.
 - Added an explicit `handlers` package marker so compatibility handlers are included deterministically.
 - Included `README.md`, `CHANGELOG.md` and `LICENSE` in source distributions.
 - Set the supported runtime floor to Python 3.9+ and retained legacy public search imports.
@@ -67,4 +74,3 @@
 
 ## [2.0.0] - 2026-01-18
 - Added the `future` async namespace and modernized the project structure.
-

@@ -1,4 +1,4 @@
-# yt-search-python 2.2.1 API notes
+# yt-search-python 2.2.2 API notes
 
 The canonical project overview and current examples live in `README.md` and the files under `docs/`.
 

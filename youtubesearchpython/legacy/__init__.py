@@ -1,7 +1,9 @@
-from typing import List, Union
 import json
-from youtubesearchpython.handlers import ComponentHandler, RequestHandler
+from typing import List, Union
+
 from youtubesearchpython.core.constants import *
+from youtubesearchpython.handlers import ComponentHandler, RequestHandler
+
 
 def overrides(interface_class):
     def overrider(method):
@@ -72,6 +74,30 @@ class LegacyComponentHandler(RequestHandler, ComponentHandler):
             'elements':                       self.__getValue(shelf, ['content', 'verticalListRenderer', 'items']),
         }
 
+    def _getLegacyLockupComponent(self, element: dict, content_type: str) -> dict:
+        component = ComponentHandler._getLockupComponent(
+            self,
+            element,
+            findVideos=content_type == "video",
+            findChannels=False,
+            findPlaylists=content_type == "playlist",
+        )
+        if not component:
+            return None
+        result = {
+            "index": self.index,
+            "id": component.get("id"),
+            "link": component.get("link"),
+            "title": component.get("title"),
+            "thumbnails": [item.get("url") for item in component.get("thumbnails") or [] if item.get("url")],
+        }
+        if content_type == "video":
+            result.update(channel=None, duration=component.get("duration"), views=0, channeId=None, publishTime=None)
+        else:
+            result.update(count=None, channel=None)
+        self.index += 1
+        return result
+
     def __getValue(self, component: Union[dict, list, None], path: List[Union[str, int]]) -> Union[str, int, dict, list, None]:
         value = component
         for key in path:
@@ -97,6 +123,7 @@ class LegacyComponentHandler(RequestHandler, ComponentHandler):
 
 class LegacySearchInternal(LegacyComponentHandler):
     def __init__(self, keyword, offset, mode, max_results, language, region):
+        super().__init__(timeout=10)
         self.index = 0
         self.exception = False
         self.resultComponents = []
@@ -108,7 +135,6 @@ class LegacySearchInternal(LegacyComponentHandler):
         self.language = language
         self.region = region
         self.continuationKey = None
-        self.timeout = 10
 
     def result(self) -> Union[str, dict, list, None]:
         '''Returns the search result.
@@ -168,6 +194,10 @@ class SearchVideos(LegacySearchInternal):
                 elements = self._getShelfComponent(element).get('elements') if isinstance(self._getShelfComponent(element), dict) else None
                 for shelfElement in elements or []:
                     self.resultComponents.append(self._getVideoComponent(shelfElement))
+            if "lockupViewModel" in element:
+                component = self._getLegacyLockupComponent(element, "video")
+                if component:
+                    self.resultComponents.append(component)
             if len(self.resultComponents) >= self.limit:
                 break
 
@@ -190,5 +220,9 @@ class SearchPlaylists(LegacySearchInternal):
         for element in self.responseSource or []:
             if playlistElementKey in element.keys():
                 self.resultComponents.append(self._getPlaylistComponent(element))
+            if "lockupViewModel" in element:
+                component = self._getLegacyLockupComponent(element, "playlist")
+                if component:
+                    self.resultComponents.append(component)
             if len(self.resultComponents) >= self.limit:
                 break

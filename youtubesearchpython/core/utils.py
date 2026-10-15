@@ -1,7 +1,7 @@
+import re
 from datetime import datetime, timezone
 from typing import Iterable, List, Optional
 from urllib.parse import parse_qs, urlparse
-import re
 
 
 def playlist_from_channel_id(channel_id: str) -> str:

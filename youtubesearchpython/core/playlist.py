@@ -4,8 +4,11 @@ from urllib.parse import urlencode
 
 from youtubesearchpython.core.componenthandler import getValue
 from youtubesearchpython.core.constants import ResultMode, searchKey
-from youtubesearchpython.core.requests import YouTubeParseError, YouTubeRequestError
-from youtubesearchpython.core.requests import RequestCore
+from youtubesearchpython.core.requests import (
+    RequestCore,
+    YouTubeParseError,
+    YouTubeRequestError,
+)
 from youtubesearchpython.core.utils import get_playlist_id, normalize_thumbnails
 
 
@@ -156,6 +159,37 @@ class PlaylistCore(RequestCore):
             "isPlayable": getValue(video, ["isPlayable"]) if getValue(video, ["isPlayable"]) is not None else not bool(getValue(video, ["unplayableText"])),
         }
 
+    @classmethod
+    def _video_from_lockup(cls, lockup: dict) -> Optional[dict]:
+        if getValue(lockup, ["contentType"]) != "LOCKUP_CONTENT_TYPE_VIDEO":
+            return None
+        video_id = getValue(lockup, ["contentId"])
+        if not video_id:
+            return None
+        metadata = getValue(lockup, ["metadata", "lockupMetadataViewModel"]) or {}
+        rows = getValue(metadata, ["metadata", "contentMetadataViewModel", "metadataRows"]) or []
+        parts = [part for row in rows for part in (getValue(row, ["metadataParts"]) or [])]
+        channel_part = next((part for part in parts if getValue(part, ["text", "commandRuns", 0, "onTap", "innertubeCommand", "browseEndpoint", "browseId"])), None)
+        channel_id = getValue(channel_part, ["text", "commandRuns", 0, "onTap", "innertubeCommand", "browseEndpoint", "browseId"])
+        badge = getValue(lockup, ["contentImage", "thumbnailViewModel", "overlays", 0, "thumbnailBottomOverlayViewModel", "badges", 0, "thumbnailBadgeViewModel"]) or {}
+        return {
+            "id": video_id,
+            "thumbnails": normalize_thumbnails(getValue(lockup, ["contentImage", "thumbnailViewModel", "image", "sources"]), video_id),
+            "title": getValue(metadata, ["title", "content"]),
+            "channel": {
+                "name": getValue(channel_part, ["text", "content"]),
+                "id": channel_id,
+                "link": f"https://www.youtube.com/channel/{channel_id}" if channel_id else None,
+            },
+            "duration": getValue(badge, ["text"]),
+            "accessibility": {
+                "title": getValue(metadata, ["title", "accessibilityLabel"]),
+                "duration": getValue(badge, ["rendererContext", "accessibilityContext", "label"]),
+            },
+            "link": f"https://www.youtube.com/watch?v={video_id}",
+            "isPlayable": True,
+        }
+
     def _extract_videos(self) -> list:
         videos = []
         seen = set()
@@ -167,7 +201,11 @@ class PlaylistCore(RequestCore):
                 component = self._video_from_playlist_renderer(renderer)
             else:
                 renderer = node.get("playlistPanelVideoRenderer")
-                component = self._video_from_panel_renderer(renderer) if isinstance(renderer, dict) else None
+                if isinstance(renderer, dict):
+                    component = self._video_from_panel_renderer(renderer)
+                else:
+                    lockup = node.get("lockupViewModel")
+                    component = self._video_from_lockup(lockup) if isinstance(lockup, dict) else None
             if component and component["id"] not in seen:
                 seen.add(component["id"])
                 videos.append(component)

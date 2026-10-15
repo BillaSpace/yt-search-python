@@ -1,4 +1,5 @@
-from typing import Union, List
+from typing import List, Union
+
 from youtubesearchpython.core.constants import *
 from youtubesearchpython.core.utils import get_video_id, normalize_thumbnails
 

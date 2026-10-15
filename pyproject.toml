@@ -4,3 +4,6 @@ build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "function"
+
+[tool.ruff.lint]
+select = ["E9", "F63", "F7", "F82", "F811", "I"]

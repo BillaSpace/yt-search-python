@@ -1,12 +1,16 @@
-from typing import Union, Optional
+import json
+from typing import Optional, Union
 from urllib.parse import urlencode
 
-from youtubesearchpython.core.requests import RequestCore
-from youtubesearchpython.core.componenthandler import ComponentHandler
-from youtubesearchpython.core.constants import *
-from youtubesearchpython.core.requests import YouTubeRequestError, YouTubeParseError
-import json
 import httpx
+
+from youtubesearchpython.core.componenthandler import ComponentHandler, getValue
+from youtubesearchpython.core.constants import *
+from youtubesearchpython.core.requests import (
+    RequestCore,
+    YouTubeParseError,
+    YouTubeRequestError,
+)
 
 
 class SearchCore(RequestCore, ComponentHandler):
@@ -189,19 +193,9 @@ class SearchCore(RequestCore, ComponentHandler):
                 break
 
 
-import json
-from typing import Union, Optional
-from urllib.parse import urlencode
-
-import httpx
-
-from youtubesearchpython.core.requests import RequestCore
-from youtubesearchpython.core.componenthandler import ComponentHandler
-from youtubesearchpython.core.constants import *
-from youtubesearchpython.core.requests import YouTubeRequestError, YouTubeParseError
-
-
 class ChannelSearchCore(RequestCore, ComponentHandler):
+    _legacy_search_params = "EgZzZWFyY2g%3D"
+
     def __init__(self, query: str, language: str, region: str, searchPreferences: str, browseId: str, timeout: Optional[int]):
         super().__init__(timeout=timeout)
         self.query = query
@@ -247,6 +241,36 @@ class ChannelSearchCore(RequestCore, ComponentHandler):
                 if items is not None:
                     return items
         return None
+
+    @staticmethod
+    def _search_params(value) -> Optional[str]:
+        tabs = getValue(value, ["contents", "twoColumnBrowseResultsRenderer", "tabs"]) or getValue(value, ["contents", "singleColumnBrowseResultsRenderer", "tabs"]) or []
+        for tab in tabs:
+            renderer = tab.get("expandableTabRenderer") if isinstance(tab, dict) else None
+            if not renderer or renderer.get("title") != "Search":
+                continue
+            return getValue(renderer, ["endpoint", "browseEndpoint", "params"])
+        return None
+
+    def _prepare_params_request(self) -> None:
+        self.url = "https://www.youtube.com/youtubei/v1/browse?" + urlencode({"key": searchKey})
+        self.data = self.buildInnertubeBody(client={"hl": self.language, "gl": self.region}, browseId=self.browseId)
+
+    def _resolve_search_params(self) -> None:
+        if self.searchPreferences != self._legacy_search_params:
+            return
+        self._prepare_params_request()
+        response = self.syncPostRequest()
+        if response.status_code == 200:
+            self.searchPreferences = self._search_params(response.json()) or self.searchPreferences
+
+    async def _resolve_search_params_async(self) -> None:
+        if self.searchPreferences != self._legacy_search_params:
+            return
+        self._prepare_params_request()
+        response = await self.asyncPostRequest()
+        if response.status_code == 200:
+            self.searchPreferences = self._search_params(response.json()) or self.searchPreferences
 
     def sync_create(self):
         self._syncRequest()
@@ -341,6 +365,8 @@ class ChannelSearchCore(RequestCore, ComponentHandler):
         })
 
     def _syncRequest(self, continuation: str = None) -> None:
+        if not continuation:
+            self._resolve_search_params()
         self._getRequestBody(continuation)
         try:
             request = self.syncPostRequest()
@@ -363,6 +389,8 @@ class ChannelSearchCore(RequestCore, ComponentHandler):
             raise YouTubeRequestError(f"Unexpected error making request: {error}")
 
     async def _asyncRequest(self, continuation: str = None) -> None:
+        if not continuation:
+            await self._resolve_search_params_async()
         self._getRequestBody(continuation)
         try:
             request = await self.asyncPostRequest()

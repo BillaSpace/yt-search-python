@@ -1,24 +1,33 @@
 import copy
 import json
-from typing import Union, List, Optional
+import urllib.parse
+from typing import List, Optional, Union
 from urllib.parse import urlencode
 
+from youtubesearchpython.core.componenthandler import (
+    ComponentHandler,
+    getValue,
+    getVideoId,
+)
 from youtubesearchpython.core.constants import *
-from youtubesearchpython.core.requests import RequestCore, get_env_auth
-from youtubesearchpython.core.componenthandler import getValue, getVideoId
-from youtubesearchpython.core.requests import YouTubeRequestError, YouTubeParseError
+from youtubesearchpython.core.requests import (
+    RequestCore,
+    YouTubeParseError,
+    YouTubeRequestError,
+    get_env_auth,
+)
 from youtubesearchpython.core.utils import (
-    get_cleaned_url,
-    format_view_count,
     format_duration,
     format_published_time,
-    normalize_thumbnails
+    format_view_count,
+    get_cleaned_url,
+    normalize_thumbnails,
 )
 
 CLIENTS = {
     "MWEB": {
         "context": {
-            "client": {"clientName": "MWEB", "clientVersion": "2.20240425.01.00"}
+            "client": {"clientName": "MWEB", "clientVersion": "2.20260821.00.00"}
         },
         "api_key": "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
     },
@@ -26,7 +35,7 @@ CLIENTS = {
         'context': {
             'client': {
                 'clientName': 'WEB',
-                'clientVersion': '2.20240502.07.00',
+                'clientVersion': '2.20260820.08.00',
                 'newVisitorCookie': True
             },
             'user': {
@@ -36,8 +45,16 @@ CLIENTS = {
         'api_key': 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8'
     },
     "ANDROID": {
-        "context": {"client": {"clientName": "ANDROID", "clientVersion": "19.02.39"}},
+        "context": {"client": {"clientName": "ANDROID", "clientVersion": "20.10.38"}},
         "api_key": "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
+        "client_code": "3",
+        "user_agent": "com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip",
+    },
+    "ANDROID_VR": {
+        "context": {"client": {"clientName": "ANDROID_VR", "clientVersion": "1.61.26"}},
+        "api_key": "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
+        "client_code": "93",
+        "user_agent": "Mozilla/5.0 (Linux; Android 12; Quest 3) AppleWebKit/537.36 (KHTML, like Gecko) OculusBrowser/32.0.0.3.17 Chrome/122.0.6261.64 Mobile Safari/537.36",
     },
     "ANDROID_EMBED": {
         "context": {
@@ -62,6 +79,10 @@ CLIENTS = {
         "api_key": "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
     },
 }
+
+CLIENTS["WEB"].update(client_code="1", user_agent=userAgent)
+CLIENTS["MWEB"].update(client_code="2", user_agent=userAgent)
+CLIENTS["TV_EMBED"].update(client_code="85", user_agent=userAgent)
 
 class VideoCore(RequestCore):
     def __init__(self, videoLink: str, componentMode: str, resultMode: int, timeout: Optional[int], enableHTML: bool, overridedClient: str = "ANDROID", po_token: str = None, visitor_data: str = None, proxy: str = None):
@@ -90,17 +111,23 @@ class VideoCore(RequestCore):
         self.result = self.__result(self.resultMode)
 
     def prepare_innertube_request(self):
+        profile = CLIENTS[self.overridedClient]
         self.url = 'https://www.youtube.com/youtubei/v1/player' + "?" + urlencode({
-            'key': searchKey,
+            'key': profile["api_key"],
             'contentCheckOk': 1,
             'racyCheckOk': 1,
             "videoId": getVideoId(self.videoLink)
         })
-        self.data = copy.deepcopy(CLIENTS[self.overridedClient])
+        self.data = {"context": copy.deepcopy(profile["context"])}
+        self.headers = {
+            "User-Agent": profile["user_agent"],
+            "X-YouTube-Client-Name": profile["client_code"],
+            "X-YouTube-Client-Version": profile["context"]["client"]["clientVersion"],
+        }
         client = self.data.setdefault("context", {}).setdefault("client", {})
         if self.visitor_data:
             client["visitorData"] = self.visitor_data
-        if self.po_token:
+        if self.po_token and self.overridedClient in {"WEB", "MWEB"}:
             self.data["serviceIntegrityDimensions"] = {"poToken": self.po_token}
 
     @staticmethod
@@ -115,7 +142,8 @@ class VideoCore(RequestCore):
         best_response = None
         best_source = None
         best_score = -1
-        for client in ["ANDROID", "WEB", "MWEB", "TV_EMBED"]:
+        clients = ["ANDROID_VR", "ANDROID", "WEB", "MWEB", "TV_EMBED"]
+        for client in clients:
             self.overridedClient = client
             self.prepare_innertube_request()
             response = await self.asyncPostRequest()
@@ -161,7 +189,8 @@ class VideoCore(RequestCore):
         best_response = None
         best_source = None
         best_score = -1
-        for client in ["ANDROID", "WEB", "MWEB", "TV_EMBED"]:
+        clients = ["ANDROID_VR", "ANDROID", "WEB", "MWEB", "TV_EMBED"]
+        for client in clients:
             self.overridedClient = client
             self.prepare_innertube_request()
             response = self.syncPostRequest()
@@ -663,16 +692,6 @@ class VideoCore(RequestCore):
         self.__videoComponent = videoComponent
 
 
-from typing import Optional
-from urllib.parse import urlencode
-
-from youtubesearchpython.core.constants import *
-from youtubesearchpython.core.requests import RequestCore
-from youtubesearchpython.core.componenthandler import ComponentHandler, getValue
-from youtubesearchpython.core.requests import YouTubeRequestError
-from youtubesearchpython.core.utils import normalize_thumbnails
-
-
 class RecommendationsCore(RequestCore, ComponentHandler):
     def __init__(self, videoId: str, timeout: Optional[int] = None):
         super().__init__(timeout=timeout)
@@ -701,7 +720,7 @@ class RecommendationsCore(RequestCore, ComponentHandler):
 
         for item in secondary_results:
             if "lockupViewModel" in item:
-                append(self._getLockupComponent(item, findVideos=True, findChannels=False, findPlaylists=False))
+                append(self._getRecommendationLockup(item["lockupViewModel"]))
             elif compactVideoElementKey in item:
                 append(self._getRecommendationsComponent(item[compactVideoElementKey]))
             elif videoElementKey in item:
@@ -709,7 +728,7 @@ class RecommendationsCore(RequestCore, ComponentHandler):
             elif itemSectionKey in item:
                 for s_item in getValue(item, [itemSectionKey, "contents"]) or []:
                     if "lockupViewModel" in s_item:
-                        append(self._getLockupComponent(s_item, findVideos=True, findChannels=False, findPlaylists=False))
+                        append(self._getRecommendationLockup(s_item["lockupViewModel"]))
                     elif compactVideoElementKey in s_item:
                         append(self._getRecommendationsComponent(s_item[compactVideoElementKey]))
                     elif videoElementKey in s_item:
@@ -742,6 +761,44 @@ class RecommendationsCore(RequestCore, ComponentHandler):
             component['channel']['link'] = 'https://www.youtube.com/channel/' + component['channel']['id']
         return component
 
+    def _getRecommendationLockup(self, lockup: dict) -> dict:
+        if self._getValue(lockup, ["contentType"]) != "LOCKUP_CONTENT_TYPE_VIDEO":
+            return None
+        video_id = self._getValue(lockup, ["contentId"])
+        metadata = self._getValue(lockup, ["metadata", "lockupMetadataViewModel"]) or {}
+        rows = self._getValue(metadata, ["metadata", "contentMetadataViewModel", "metadataRows"]) or []
+        parts = [part for row in rows for part in (self._getValue(row, ["metadataParts"]) or [])]
+        channel_part = next((part for part in parts if self._getValue(part, ["text", "commandRuns", 0, "onTap", "innertubeCommand", "browseEndpoint", "browseId"])), None)
+        duration = self._getValue(lockup, ["contentImage", "thumbnailViewModel", "overlays", 0, "thumbnailBottomOverlayViewModel", "badges", 0, "thumbnailBadgeViewModel", "text"])
+        view_part = next((part for part in parts if self._getValue(part, ["text", "leadingIcon", "name"]) == "PLAY_ARROW_OUTLINED"), None)
+        published_part = next((part for part in parts if part is not channel_part and part is not view_part), None)
+        channel_id = self._getValue(channel_part, ["text", "commandRuns", 0, "onTap", "innertubeCommand", "browseEndpoint", "browseId"])
+        component = {
+            "type": "video",
+            "id": video_id,
+            "title": self._getValue(metadata, ["title", "content"]),
+            "publishedTime": self._getValue(published_part, ["text", "content"]),
+            "duration": duration,
+            "viewCount": {
+                "text": self._getValue(view_part, ["text", "accessibilityLabel"]),
+                "short": self._getValue(view_part, ["text", "content"]),
+            },
+            "thumbnails": normalize_thumbnails(self._getValue(lockup, ["contentImage", "thumbnailViewModel", "image", "sources"]), video_id),
+            "channel": {
+                "name": self._getValue(channel_part, ["text", "content"]),
+                "id": channel_id,
+            },
+            "isLive": duration is None and any(self._getValue(part, ["text", "content"]) == "LIVE" for part in parts),
+            "accessibility": {
+                "title": self._getValue(metadata, ["title", "accessibilityLabel"]),
+                "duration": self._getValue(lockup, ["contentImage", "thumbnailViewModel", "overlays", 0, "thumbnailBottomOverlayViewModel", "badges", 0, "thumbnailBadgeViewModel", "rendererContext", "accessibilityContext", "label"]),
+            },
+        }
+        component["link"] = f"https://www.youtube.com/watch?v={video_id}" if video_id else None
+        if channel_id:
+            component["channel"]["link"] = f"https://www.youtube.com/channel/{channel_id}"
+        return component
+
     def _parse_http_response(self, response):
         if response.status_code != 200:
             raise YouTubeRequestError(f"Invalid status code {response.status_code} for recommendations request")
@@ -754,14 +811,6 @@ class RecommendationsCore(RequestCore, ComponentHandler):
     def sync_create(self):
         self.prepare_request()
         self._parse_http_response(self.syncPostRequest())
-
-
-import copy
-import urllib.parse
-from typing import Optional
-
-from youtubesearchpython.core.componenthandler import getValue
-from youtubesearchpython.core.requests import RequestCore, get_env_auth
 
 
 class StreamURLFetcherCore(RequestCore):

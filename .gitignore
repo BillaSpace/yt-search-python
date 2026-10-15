@@ -5,6 +5,11 @@
 
 __pycache__
 dist
+build
+*.egg-info
+.pytest_cache
+.ruff_cache
+.venv
 *.env
 # testing
 test.py
