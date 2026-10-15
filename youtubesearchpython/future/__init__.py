@@ -4,6 +4,7 @@ from typing import Any, Dict, Optional, Union
 
 from youtubesearchpython.attestation import BotGuard
 from youtubesearchpython.core.constants import *
+from youtubesearchpython.core.mixes import MixesCore
 from youtubesearchpython.core.playlist import PlaylistCore
 from youtubesearchpython.core.requests import aclose_clients, close_clients
 from youtubesearchpython.core.search import ChannelSearchCore, SearchCore
@@ -338,7 +339,15 @@ class Recommendations:
     async def get(videoId: str, timeout: int = None) -> Union[dict, None]:
         recommendations_core = RecommendationsCore(videoId, timeout)
         await recommendations_core.async_create()
-        return recommendations_core.resultComponents        
+        return recommendations_core.resultComponents
+
+
+class Mixes:
+    @staticmethod
+    async def get(videoLink: str, timeout: int = None) -> list:
+        mixes_core = MixesCore(videoLink, timeout)
+        await mixes_core.async_create()
+        return mixes_core.resultComponents
 
 
 class StreamURLFetcher(StreamURLFetcherCore):
@@ -368,6 +377,6 @@ __title__='yt-search-python'
 __version__='2.2.2'
 __author__='Prakhar-Shukla'
 __license__='MIT'
-__all__=['Search','VideosSearch','ChannelsSearch','PlaylistsSearch','CustomSearch','ChannelSearch','Video','Playlist','Suggestions','SuggestionsSession','Hashtag','Comments','Transcript','Channel','Recommendations','StreamURLFetcher','BotGuard','aclose_clients','close_clients','ResultMode','SearchMode','VideoUploadDateFilter','VideoDurationFilter','VideoSortOrder','ChannelRequestType','playlist_from_channel_id']
-for _name in ('search','extras','streamurlfetcher'):
+__all__=['Search','VideosSearch','ChannelsSearch','PlaylistsSearch','CustomSearch','ChannelSearch','Video','Playlist','Suggestions','SuggestionsSession','Hashtag','Comments','Transcript','Channel','Recommendations','Mixes','StreamURLFetcher','BotGuard','aclose_clients','close_clients','ResultMode','SearchMode','VideoUploadDateFilter','VideoDurationFilter','VideoSortOrder','ChannelRequestType','playlist_from_channel_id']
+for _name in ('search','extras','mixes','streamurlfetcher'):
     _sys.modules[f'{__name__}.{_name}']=_sys.modules[__name__]

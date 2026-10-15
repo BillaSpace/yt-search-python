@@ -17,7 +17,7 @@
 
 # yt-search-python v2.2.2
 
-Search YouTube videos, playlists, channels, comments, transcripts, recommendations, suggestions, and stream metadata without the YouTube Data API v3.
+Search YouTube videos, playlists, mixes, channels, comments, transcripts, recommendations, suggestions, and stream metadata without the YouTube Data API v3.
 
 - Python 3.9+
 - Sync API: `youtubesearchpython`
@@ -104,6 +104,15 @@ formats = Video.getFormats(video_id, po_token=po_token)
 
 The async namespace exposes the same `BotGuard` class and `await BotGuard.agenerate(video_id)`.
 
+`Video` and `StreamURLFetcher` can also read PO-token values from the environment when explicit arguments are not passed:
+
+```bash
+export YT_PO_TOKEN="..."
+export YT_VISITOR_DATA="..."
+```
+
+`YOUTUBE_PO_TOKEN` and `YOUTUBE_VISITOR_DATA` are supported aliases. Explicit arguments take precedence.
+
 ## StreamURLFetcher
 
 `StreamURLFetcher` no longer uses yt-dlp. It can process a `Video.getFormats()` result or fetch the format data from a video ID/link itself. PO-token generation and session-aware token caching can be handled separately through the [`ytsp-po-token-provider`](https://github.com/BillaSpace/ytsp-po-token-provider).
@@ -143,6 +152,26 @@ mix = Playlist.get("https://youtube.com/playlist?list=RDpnxL4OOzPEc&playnext=1")
 Mix results preserve YouTube's returned song order. Duplicate video IDs are removed without re-sorting the result. Generic comment/engagement continuation tokens from `/next` responses are not treated as playlist continuations.
 
 For regular playlists, instantiate `Playlist(link)` and call `getNextVideos()` for continuation pages.
+
+## Mixes
+
+`Mixes` accepts a video ID, video URL, or existing `RD...` mix ID and returns a direct list with the same item fields as `Recommendations`.
+
+```python
+from youtubesearchpython import Mixes
+
+mix = Mixes.get("pnxL4OOzPEc")
+```
+
+Async:
+
+```python
+from youtubesearchpython.future import Mixes
+
+mix = await Mixes.get("https://www.youtube.com/watch?v=pnxL4OOzPEc")
+```
+
+The list preserves YouTube's mix order and removes duplicate video IDs without re-sorting.
 
 ## Recommendations
 
@@ -222,6 +251,7 @@ Content:
 - `Hashtag`
 - `Suggestions`
 - `Recommendations`
+- `Mixes`
 
 Streaming:
 - `StreamURLFetcher`
@@ -234,31 +264,6 @@ Utilities:
 - `VideoSortOrder`
 - `ChannelRequestType`
 
-## Compatibility notes
-
-- `youtubesearchpython.future` is the supported async namespace.
-- Legacy `SearchVideos` and `SearchPlaylists` imports remain available.
-- YouTube's internal response structures and anti-abuse requirements can change without notice.
-- A PO token does not replace player JavaScript signature or `n`-challenge transformation when YouTube requires those for a format.
-
-## License
-
-MIT. See `LICENSE`.
-
-Current maintainer: Prakhar Shukla / BillaSpace. Original project by Hitesh Kumar Saini (alexmercerind).
-
-### Optional PO token environment variables
-
-`Video` and `StreamURLFetcher` keep their existing arguments, but can also read credentials from the environment when explicit values are not passed:
-
-```bash
-export YT_PO_TOKEN="..."
-export YT_VISITOR_DATA="..."
-```
-
-Aliases `YOUTUBE_PO_TOKEN` and `YOUTUBE_VISITOR_DATA` are also supported. Explicit function/class arguments always take precedence over environment values.
-
-
 ## Python compatibility
 
 - Python 3.9+
@@ -268,6 +273,19 @@ Aliases `YOUTUBE_PO_TOKEN` and `YOUTUBE_VISITOR_DATA` are also supported. Explic
 
 HTTP clients are managed internally. Normal sync applications require no explicit shutdown call, and async clients are closed automatically when their owning event loop shuts down gracefully (including `asyncio.run()`). `close_clients()` and `aclose_clients()` remain available only for optional forced teardown, tests, or unusual lifecycle control.
 
+## Compatibility notes
+
+- `youtubesearchpython.future` is the supported async namespace.
+- Legacy `SearchVideos` and `SearchPlaylists` imports remain available.
+- YouTube's internal response structures and anti-abuse requirements can change without notice.
+- A PO token does not replace player JavaScript signature or `n`-challenge transformation when YouTube requires those for a format.
+
 ## Related project
 
 For PO-token generation, refresh, session-aware caching, and external provider integration, see [`BillaSpace/ytsp-po-token-provider`](https://github.com/BillaSpace/ytsp-po-token-provider).
+
+## License
+
+MIT. See `LICENSE`.
+
+Current maintainer: Prakhar Shukla / BillaSpace. Original project by Hitesh Kumar Saini (alexmercerind).

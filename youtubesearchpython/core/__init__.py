@@ -5,6 +5,7 @@ from . import search as _search
 from . import social as _social
 from . import video as _video
 from .constants import *
+from .mixes import MixesCore
 from .playlist import PlaylistCore
 from .search import ChannelSearchCore, SearchCore
 from .social import (

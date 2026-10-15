@@ -1,6 +1,7 @@
 from typing import Optional, Union
 
 from youtubesearchpython.core.constants import *
+from youtubesearchpython.core.mixes import MixesCore
 from youtubesearchpython.core.playlist import PlaylistCore
 from youtubesearchpython.core.search import ChannelSearchCore, SearchCore
 from youtubesearchpython.core.social import (
@@ -365,7 +366,14 @@ class Recommendations:
         recommendationsInternal = RecommendationsCore(videoId, timeout)
         recommendationsInternal.sync_create()
         return recommendationsInternal.resultComponents
-            
+
+
+class Mixes:
+    @staticmethod
+    def get(videoLink: str, timeout: int = None) -> list:
+        mixesInternal = MixesCore(videoLink, timeout)
+        mixesInternal.sync_create()
+        return mixesInternal.resultComponents
 
 
 class StreamURLFetcher(StreamURLFetcherCore):

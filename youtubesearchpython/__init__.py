@@ -14,6 +14,7 @@ from youtubesearchpython.sync import (
     Comments,
     CustomSearch,
     Hashtag,
+    Mixes,
     Playlist,
     PlaylistsSearch,
     Recommendations,
@@ -30,4 +31,4 @@ __title__='yt-search-python'
 __version__='2.2.2'
 __author__='Prakhar-Shukla'
 __license__='MIT'
-for _name in ('search','extras','streamurlfetcher'): _sys.modules[f'{__name__}.{_name}']=_sync
+for _name in ('search','extras','mixes','streamurlfetcher'): _sys.modules[f'{__name__}.{_name}']=_sync

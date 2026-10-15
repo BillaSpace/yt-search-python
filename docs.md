@@ -60,6 +60,24 @@ mix = Playlist.get("https://youtube.com/playlist?list=RDpnxL4OOzPEc&playnext=1")
 
 Regular playlist pagination uses `Playlist(link).getNextVideos()`. Mix/Radio results use the native `/next` response and preserve YouTube's returned order.
 
+## Mixes
+
+```python
+from youtubesearchpython import Mixes
+
+videos = Mixes.get("pnxL4OOzPEc")
+```
+
+`Mixes.get()` accepts a video ID, video URL, or `RD...` mix ID. It returns a list whose video fields match `Recommendations.get()`.
+
+Async:
+
+```python
+from youtubesearchpython.future import Mixes
+
+videos = await Mixes.get("pnxL4OOzPEc")
+```
+
 ## Recommendations
 
 ```python

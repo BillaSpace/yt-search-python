@@ -13,6 +13,7 @@ from youtubesearchpython.search import VideosSearch
 
 from youtubesearchpython.core.componenthandler import getValue
 from youtubesearchpython.core.constants import ResultMode, SearchMode
+from youtubesearchpython.core.mixes import MixesCore
 from youtubesearchpython.core.playlist import PlaylistCore
 from youtubesearchpython.core.requests import RequestCore, aclose_clients, close_clients
 from youtubesearchpython.core.utils import (
@@ -114,6 +115,37 @@ def test_rd_playlist_uses_next_endpoint_and_parses_panel():
     assert core.result['info']['id'] == 'RDpnxL4OOzPEc'
     assert core.result['info']['title'] == 'Mix - Azul'
     assert [x['id'] for x in core.result['videos']] == ['pnxL4OOzPEc', 'abcdefghijk']
+
+
+def test_mixes_accepts_video_urls_and_matches_recommendations_shape():
+    core = MixesCore('https://www.youtube.com/watch?v=pnxL4OOzPEc', 10)
+    assert core._playlist.playlistId == 'RDpnxL4OOzPEc'
+    core._playlist.responseSource = _rd_fixture()
+    core._playlist._process(first=True)
+    core._process()
+    assert [item['id'] for item in core.resultComponents] == ['pnxL4OOzPEc', 'abcdefghijk']
+    expected = {
+        'type', 'id', 'title', 'publishedTime', 'duration', 'viewCount',
+        'thumbnails', 'channel', 'isLive', 'accessibility', 'link',
+    }
+    assert all(set(item) == expected for item in core.resultComponents)
+    assert core.resultComponents[0]['duration'] == '2:32'
+    assert core.resultComponents[0]['channel']['link'] == 'https://www.youtube.com/channel/UC123'
+
+
+def test_mixes_accepts_rd_mix_ids():
+    assert MixesCore('RDpnxL4OOzPEc')._playlist.playlistId == 'RDpnxL4OOzPEc'
+
+
+def test_mixes_rejects_invalid_video_ids():
+    from youtubesearchpython.core.requests import YouTubeRequestError
+
+    try:
+        MixesCore('!!!!!!!!!!!')
+    except YouTubeRequestError:
+        pass
+    else:
+        raise AssertionError('expected YouTubeRequestError')
 
 
 def test_async_client_survives_repeated_event_loops():
@@ -908,7 +940,7 @@ def test_sync_and_future_public_search_exports_remain_compatible():
     names = [
         'Search', 'VideosSearch', 'ChannelsSearch', 'PlaylistsSearch',
         'CustomSearch', 'ChannelSearch', 'Video', 'Playlist', 'Suggestions',
-        'Hashtag', 'Comments', 'Transcript', 'Channel', 'Recommendations',
+        'Hashtag', 'Comments', 'Transcript', 'Channel', 'Recommendations', 'Mixes',
         'StreamURLFetcher',
     ]
     for name in names:
@@ -921,6 +953,7 @@ def test_sync_and_future_public_search_exports_remain_compatible():
     assert inspect.iscoroutinefunction(async_api.PlaylistsSearch.next)
     assert inspect.iscoroutinefunction(async_api.Playlist.get)
     assert inspect.iscoroutinefunction(async_api.Recommendations.get)
+    assert inspect.iscoroutinefunction(async_api.Mixes.get)
     assert inspect.iscoroutinefunction(async_api.StreamURLFetcher.get)
 
 

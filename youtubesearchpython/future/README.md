@@ -8,7 +8,15 @@ first = await search.next()
 second = await search.next()
 ```
 
-Available async APIs include `Search`, `VideosSearch`, `ChannelsSearch`, `PlaylistsSearch`, `CustomSearch`, `ChannelSearch`, `Video`, `Playlist`, `Channel`, `Comments`, `Transcript`, `Hashtag`, `Suggestions`, `Recommendations`, and `StreamURLFetcher`.
+Available async APIs include `Search`, `VideosSearch`, `ChannelsSearch`, `PlaylistsSearch`, `CustomSearch`, `ChannelSearch`, `Video`, `Playlist`, `Mixes`, `Channel`, `Comments`, `Transcript`, `Hashtag`, `Suggestions`, `Recommendations`, and `StreamURLFetcher`.
+
+YouTube Mixes:
+
+```python
+from youtubesearchpython.future import Mixes
+
+videos = await Mixes.get("pnxL4OOzPEc")
+```
 
 Live-only video search:
 

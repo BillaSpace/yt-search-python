@@ -110,6 +110,23 @@ while playlist_obj.hasMoreVideos:
     print(playlist_obj.result())
 ```
 
+## Mixes.get()
+
+```python
+from youtubesearchpython import Mixes
+
+mix = Mixes.get("E07s5ZYygMg")
+print(mix)
+```
+
+`Mixes.get()` accepts a video ID, video URL, or `RD...` mix ID. It returns a direct list with the same item fields as `Recommendations.get()`.
+
+```python
+from youtubesearchpython.future import Mixes
+
+mix = await Mixes.get("E07s5ZYygMg")
+```
+
 ## Suggestions.get()
 
 ### Basic Usage

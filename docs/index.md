@@ -1,6 +1,6 @@
 ---
 title: yt-search-python
-description: YouTube search library for Python with sync and async APIs, playlists, transcripts, recommendations, Innertube support and stream URL handling.
+description: YouTube search library for Python with sync and async APIs, mixes, playlists, recommendations, BotGuard integration and stream URL handling.
 ---
 
 <style>
@@ -261,7 +261,7 @@ details.ytsp-sub[open]>summary:after{content:"−"}
   <div class="ytsp-kicker">Python 3.9+ · Sync + Async</div>
   <h1>YouTube search for Python, without the API-key overhead.</h1>
   <p>
-    Search videos, playlists and channels; work with recommendations, suggestions,
+    Search videos, playlists, mixes and channels; work with recommendations, suggestions,
     comments, transcripts, hashtags, Innertube data and stream formats from one compact
     Python library. The public API stays familiar while transport and resource ownership
     are centralized for long-running applications.
@@ -296,6 +296,7 @@ details.ytsp-sub[open]>summary:after{content:"−"}
       <strong>Async uses the same project.</strong><br>
       Import async classes from <span class="ytsp-inline">youtubesearchpython.future</span>.
       For transcript fallback support, install <span class="ytsp-inline">yt-search-python[transcript]</span>.
+      For local BotGuard PO-token generation, install <span class="ytsp-inline">yt-search-python[botguard]</span>.
     </div>
   </div>
 </section>
@@ -522,6 +523,33 @@ print(related)</code></pre></div></div></details>
     </details>
 
     <details class="ytsp-api">
+      <summary><span class="ytsp-api-title"><strong>Mixes</strong><span>Native YouTube Mix / Radio results in the Recommendations item format</span></span><span class="ytsp-chevron">+</span></summary>
+      <div class="ytsp-api-body">
+        <code class="ytsp-signature">Mixes.get(videoLink, timeout=None)</code>
+        <p>Accepts a video ID, video URL or existing <span class="ytsp-inline">RD...</span> mix ID. Results preserve YouTube's order, remove duplicate IDs stably and use the same item fields as <span class="ytsp-inline">Recommendations</span>.</p>
+        <details class="ytsp-sub"><summary>Example</summary><div class="ytsp-sub-body"><div class="ytsp-code"><div class="ytsp-codebar"><span class="ytsp-file">mixes.py</span></div><pre><code><span class="kw">from</span> youtubesearchpython <span class="kw">import</span> Mixes
+
+mix = Mixes.get(<span class="str">"pnxL4OOzPEc"</span>)
+print(mix)</code></pre></div></div></details>
+        <details class="ytsp-sub"><summary>Response shape</summary><div class="ytsp-sub-body"><pre class="ytsp-shape">[
+  {
+    "type": "video",
+    "id": "MIX_VIDEO_ID",
+    "title": "...",
+    "publishedTime": null,
+    "duration": "...",
+    "viewCount": {"text": null, "short": null},
+    "thumbnails": [...],
+    "channel": {...},
+    "isLive": false,
+    "accessibility": {...},
+    "link": "https://www.youtube.com/watch?v=..."
+  }
+]</pre></div></details>
+      </div>
+    </details>
+
+    <details class="ytsp-api">
       <summary><span class="ytsp-api-title"><strong>Suggestions</strong><span>Query suggestions with language / region support and reusable sessions</span></span><span class="ytsp-chevron">+</span></summary>
       <div class="ytsp-api-body">
         <code class="ytsp-signature">Suggestions.get(query, language="en", region="US", timeout=None, mode=ResultMode.dict)</code>
@@ -643,6 +671,21 @@ print(music)</code></pre></div></div></details>
       </div>
     </details>
 
+    <details class="ytsp-api">
+      <summary><span class="ytsp-api-title"><strong>BotGuard</strong><span>Optional local PO-token generation through the companion provider</span></span><span class="ytsp-chevron">+</span></summary>
+      <div class="ytsp-api-body">
+        <code class="ytsp-signature">BotGuard.generate(video_id) · await BotGuard.agenerate(video_id)</code>
+        <p>Install the <span class="ytsp-inline">botguard</span> extra. Generated web PO tokens are passed explicitly to <span class="ytsp-inline">Video</span> or <span class="ytsp-inline">StreamURLFetcher</span>.</p>
+        <details class="ytsp-sub"><summary>Example</summary><div class="ytsp-sub-body"><div class="ytsp-code"><div class="ytsp-codebar"><span class="ytsp-file">botguard.py</span></div><pre><code>pip install <span class="str">'yt-search-python[botguard]'</span>
+
+<span class="kw">from</span> youtubesearchpython <span class="kw">import</span> BotGuard, Video
+
+video_id = <span class="str">"pnxL4OOzPEc"</span>
+token = BotGuard.generate(video_id)
+formats = Video.getFormats(video_id, po_token=token)</code></pre></div></div></details>
+      </div>
+    </details>
+
     <details class="ytsp-api" id="streaming">
       <summary><span class="ytsp-api-title"><strong>StreamURLFetcher</strong><span>Direct/already-signed formats, unresolved cipher reporting and PO-token handoff</span></span><span class="ytsp-chevron">+</span></summary>
       <div class="ytsp-api-body">
@@ -681,7 +724,7 @@ all_formats = fetcher.getAll(<span class="str">"pnxL4OOzPEc"</span>)</code></pre
     <details class="ytsp-api">
       <summary><span class="ytsp-api-title"><strong>Async API</strong><span>Same high-level API under youtubesearchpython.future</span></span><span class="ytsp-chevron">+</span></summary>
       <div class="ytsp-api-body">
-        <p>Search classes load the first page on the first awaited <span class="ytsp-inline">next()</span>. Content methods such as <span class="ytsp-inline">Video.getInfo</span>, <span class="ytsp-inline">Playlist.get</span>, <span class="ytsp-inline">Recommendations.get</span> and <span class="ytsp-inline">StreamURLFetcher.getAll</span> are awaitable in the future namespace.</p>
+        <p>Search classes load the first page on the first awaited <span class="ytsp-inline">next()</span>. Content methods such as <span class="ytsp-inline">Video.getInfo</span>, <span class="ytsp-inline">Playlist.get</span>, <span class="ytsp-inline">Mixes.get</span>, <span class="ytsp-inline">Recommendations.get</span> and <span class="ytsp-inline">StreamURLFetcher.getAll</span> are awaitable in the future namespace.</p>
         <details class="ytsp-sub"><summary>Example</summary><div class="ytsp-sub-body"><div class="ytsp-code"><div class="ytsp-codebar"><span class="ytsp-file">async_search.py</span></div><pre><code><span class="kw">import</span> asyncio
 <span class="kw">from</span> youtubesearchpython.future <span class="kw">import</span> VideosSearch
 

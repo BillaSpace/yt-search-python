@@ -6,6 +6,8 @@
 - Preserved all sync, async, and legacy import paths while fixing legacy transport initialization.
 - Parsed durations and metadata from the current recommendation lockup response shape.
 - Added optional BotGuard-backed PO-token integration through the companion provider.
+- Added the global sync and async `Mixes` API with video ID, video URL, and `RD...` mix input support.
+- Normalized `Mixes` items to the same field contract as `Recommendations` while preserving YouTube's order.
 
 ## [2.2.1] - 2026-08-14
 
