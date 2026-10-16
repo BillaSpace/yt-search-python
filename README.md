@@ -19,6 +19,14 @@
 
 Search YouTube videos, playlists, mixes, channels, comments, transcripts, recommendations, suggestions, and stream metadata without the YouTube Data API v3.
 
+## Documentation
+
+- [Installation and sync API](#installation)
+- [Async API guide](youtubesearchpython/future/README.md)
+- [BotGuard PO tokens](#botguard-po-tokens)
+- [Streaming](#streamurlfetcher)
+- [Full API notes](docs.md)
+
 - Python 3.9+
 - Sync API: `youtubesearchpython`
 - Async API: `youtubesearchpython.future`
@@ -49,7 +57,7 @@ live = VideosSearch("news", limit=10, is_live=True)
 print(live.result())
 ```
 
-Async search loads its first page on the first `await next()` call:
+Async search loads its first page on the first `await next()` call. The complete async guide is available in [`youtubesearchpython/future/README.md`](youtubesearchpython/future/README.md).
 
 ```python
 import asyncio

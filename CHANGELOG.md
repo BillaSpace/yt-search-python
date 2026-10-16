@@ -1,6 +1,6 @@
 # Changelog
 
-## [2.2.2] - Unreleased
+## [2.2.2] - 2026-10-16
 
 - Restored live streaming-format retrieval with current, internally consistent Innertube client profiles.
 - Preserved all sync, async, and legacy import paths while fixing legacy transport initialization.
@@ -9,6 +9,8 @@
 - Added lazy automatic BotGuard fallback for bot-confirmation player responses in sync and async video APIs.
 - Scoped generated web tokens to WEB/MWEB retries and kept successful Android-family requests token-free.
 - Added automatic video-bound token application when `StreamURLFetcher` receives a video ID or URL.
+- Removed deprecated `handlers/` and `legacy/` package directories while preserving root legacy search imports through modern search adapters.
+- Added a dedicated async API guide under `youtubesearchpython/future/README.md`.
 - Added the global sync and async `Mixes` API with video ID, video URL, and `RD...` mix input support.
 - Normalized `Mixes` items to the same field contract as `Recommendations` while preserving YouTube's order.
 

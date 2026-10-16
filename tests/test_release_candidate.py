@@ -904,12 +904,17 @@ def test_explicit_po_token_beats_env(monkeypatch):
 
 
 def test_legacy_componenthandler_import_path_preserved():
+    from youtubesearchpython.handlers import RequestHandler
     from youtubesearchpython.handlers.componenthandler import (
         ComponentHandler,
         getValue,
         getVideoId,
     )
+    from youtubesearchpython.handlers.requesthandler import (
+        RequestHandler as NestedRequestHandler,
+    )
     assert ComponentHandler is not None
+    assert NestedRequestHandler is RequestHandler
     assert getValue({"a":{"b":1}}, ["a","b"]) == 1
     assert getVideoId("https://youtu.be/pnxL4OOzPEc") == "pnxL4OOzPEc"
 
@@ -991,37 +996,80 @@ def test_sync_and_future_public_search_exports_remain_compatible():
     assert inspect.iscoroutinefunction(async_api.StreamURLFetcher.get)
 
 
-def test_legacy_search_initializes_transport_state():
-    from youtubesearchpython.legacy import LegacySearchInternal
+def test_legacy_search_imports_use_modern_compatibility_adapter(monkeypatch):
+    from youtubesearchpython.legacy import SearchVideos as LegacySearchVideos
 
-    legacy = LegacySearchInternal("query", 1, "dict", 3, "en", "US")
+    from youtubesearchpython import SearchVideos
 
-    assert legacy.headers is None
-    assert legacy.proxy is None
-    assert legacy.timeout == 10
+    class Search:
+        def __init__(self, *args, **kwargs):
+            pass
 
+        def next(self):
+            return False
 
-def test_legacy_playlist_lockup_preserves_result_shape():
-    from youtubesearchpython.legacy import LegacySearchInternal
+        def result(self):
+            return {'result': [{
+                'id': 'abcdefghijk',
+                'link': 'https://www.youtube.com/watch?v=abcdefghijk',
+                'title': 'Video',
+                'channel': {'id': 'UC123', 'name': 'Channel'},
+                'duration': '3:00',
+                'viewCount': {'text': '1,234 views'},
+                'thumbnails': [{'url': 'https://example.com/thumb.jpg'}],
+                'publishedTime': 'today',
+            }]}
 
-    legacy = LegacySearchInternal("query", 1, "dict", 3, "en", "US")
-    result = legacy._getLegacyLockupComponent({
-        "lockupViewModel": {
-            "contentType": "LOCKUP_CONTENT_TYPE_PLAYLIST",
-            "contentId": "PL123",
-            "metadata": {"lockupMetadataViewModel": {"title": {"content": "Playlist"}}},
-            "contentImage": {"collectionThumbnailViewModel": {"primaryThumbnail": {"thumbnailViewModel": {"image": {"sources": [{"url": "https://example.com/thumb.jpg"}]}}}}},
-        }
-    }, "playlist")
+    monkeypatch.setattr(SearchVideos, 'search_class', Search)
+    result = SearchVideos('query', mode='dict').result()['search_result'][0]
 
+    assert LegacySearchVideos is SearchVideos
     assert result == {
-        "index": 0,
-        "id": "PL123",
-        "link": "https://www.youtube.com/playlist?list=PL123",
-        "title": "Playlist",
-        "thumbnails": ["https://example.com/thumb.jpg"],
-        "count": None,
-        "channel": None,
+        'index': 0,
+        'id': 'abcdefghijk',
+        'link': 'https://www.youtube.com/watch?v=abcdefghijk',
+        'title': 'Video',
+        'channel': 'Channel',
+        'duration': '3:00',
+        'views': 1234,
+        'thumbnails': ['https://example.com/thumb.jpg'],
+        'channeId': 'UC123',
+        'publishTime': 'today',
+    }
+
+
+def test_legacy_playlist_import_uses_modern_compatibility_adapter(monkeypatch):
+    from youtubesearchpython.legacy import SearchPlaylists as LegacySearchPlaylists
+
+    from youtubesearchpython import SearchPlaylists
+
+    class Search:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def next(self):
+            return False
+
+        def result(self):
+            return {'result': [{
+                'id': 'PL123',
+                'link': 'https://www.youtube.com/playlist?list=PL123',
+                'title': 'Playlist',
+                'thumbnails': [{'url': 'https://example.com/thumb.jpg'}],
+            }]}
+
+    monkeypatch.setattr(SearchPlaylists, 'search_class', Search)
+    result = SearchPlaylists('query', mode='dict').result()['search_result'][0]
+
+    assert LegacySearchPlaylists is SearchPlaylists
+    assert result == {
+        'index': 0,
+        'id': 'PL123',
+        'link': 'https://www.youtube.com/playlist?list=PL123',
+        'title': 'Playlist',
+        'thumbnails': ['https://example.com/thumb.jpg'],
+        'count': None,
+        'channel': None,
     }
 
 
