@@ -10,6 +10,8 @@ print(fetcher.get("pnxL4OOzPEc", 18))
 print(fetcher.getAll("pnxL4OOzPEc"))
 ```
 
+With `yt-search-python[botguard]` installed, video ID/link input automatically resolves a video-bound token before fetching and normalizing stream URLs. Pass `auto_po_token=False` to disable this behavior.
+
 ## From `Video.getFormats`
 
 ```python

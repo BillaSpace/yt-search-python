@@ -444,9 +444,9 @@ search.next()</code></pre></div></div></details>
     <details class="ytsp-api">
       <summary><span class="ytsp-api-title"><strong>Video</strong><span>Video metadata, player information and format extraction</span></span><span class="ytsp-chevron">+</span></summary>
       <div class="ytsp-api-body">
-        <code class="ytsp-signature">Video.getInfo(videoLink, mode=ResultMode.dict, timeout=None, po_token=None, visitor_data=None, proxy=None)</code>
-        <code class="ytsp-signature">Video.getFormats(videoLink, mode=ResultMode.dict, timeout=None, po_token=None, visitor_data=None, proxy=None)</code>
-        <p>PO token and visitor data are optional inputs for sessions/clients where YouTube requires them.</p>
+        <code class="ytsp-signature">Video.getInfo(videoLink, mode=ResultMode.dict, timeout=None, po_token=None, visitor_data=None, proxy=None, auto_po_token=True)</code>
+        <code class="ytsp-signature">Video.getFormats(videoLink, mode=ResultMode.dict, timeout=None, po_token=None, visitor_data=None, proxy=None, auto_po_token=True)</code>
+        <p>PO token and visitor data are optional inputs for sessions/clients where YouTube requires them. With the BotGuard extra installed, bot-confirmation responses trigger a lazy video-bound token retry on WEB/MWEB. Explicit values take precedence.</p>
         <details class="ytsp-sub"><summary>Example</summary><div class="ytsp-sub-body"><div class="ytsp-code"><div class="ytsp-codebar"><span class="ytsp-file">video.py</span></div><pre><code><span class="kw">from</span> youtubesearchpython <span class="kw">import</span> Video
 
 info = Video.getInfo(<span class="str">"pnxL4OOzPEc"</span>)
@@ -675,7 +675,8 @@ print(music)</code></pre></div></div></details>
       <summary><span class="ytsp-api-title"><strong>BotGuard</strong><span>Optional local PO-token generation through the companion provider</span></span><span class="ytsp-chevron">+</span></summary>
       <div class="ytsp-api-body">
         <code class="ytsp-signature">BotGuard.generate(video_id) · await BotGuard.agenerate(video_id)</code>
-        <p>Install the <span class="ytsp-inline">botguard</span> extra. Generated web PO tokens are passed explicitly to <span class="ytsp-inline">Video</span> or <span class="ytsp-inline">StreamURLFetcher</span>.</p>
+        <code class="ytsp-signature">BotGuard.resolve(video_id) · await BotGuard.aresolve(video_id)</code>
+        <p>Install the <span class="ytsp-inline">botguard</span> extra. Video APIs automatically use the provider only after a bot-confirmation response; <span class="ytsp-inline">StreamURLFetcher</span> resolves a token when given a video ID/link. Manual methods remain available for explicit lifecycle control.</p>
         <details class="ytsp-sub"><summary>Example</summary><div class="ytsp-sub-body"><div class="ytsp-code"><div class="ytsp-codebar"><span class="ytsp-file">botguard.py</span></div><pre><code>pip install <span class="str">'yt-search-python[botguard]'</span>
 
 <span class="kw">from</span> youtubesearchpython <span class="kw">import</span> BotGuard, Video
@@ -689,7 +690,7 @@ formats = Video.getFormats(video_id, po_token=token)</code></pre></div></div></d
     <details class="ytsp-api" id="streaming">
       <summary><span class="ytsp-api-title"><strong>StreamURLFetcher</strong><span>Direct/already-signed formats, unresolved cipher reporting and PO-token handoff</span></span><span class="ytsp-chevron">+</span></summary>
       <div class="ytsp-api-body">
-        <code class="ytsp-signature">StreamURLFetcher(proxy=None, cookies_file=None, po_token=None, visitor_data=None)</code>
+        <code class="ytsp-signature">StreamURLFetcher(proxy=None, cookies_file=None, po_token=None, visitor_data=None, auto_po_token=True)</code>
         <code class="ytsp-signature">get(videoFormats_or_id, itag, po_token=None) · getAll(videoFormats_or_id, po_token=None)</code>
         <p>The fetcher does not depend on yt-dlp. Formats that still require encrypted player-JavaScript deciphering are surfaced under <span class="ytsp-inline">unresolved</span>; URLs that retain an <span class="ytsp-inline">n</span> challenge are marked throttled.</p>
         <p>PO-token generation and session-aware caching can be handled separately by <a href="https://github.com/BillaSpace/ytsp-po-token-provider"><strong>ytsp-po-token-provider ↗</strong></a>.</p>

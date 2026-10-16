@@ -104,6 +104,20 @@ formats = Video.getFormats(video_id, po_token=po_token)
 
 The async namespace exposes the same `BotGuard` class and `await BotGuard.agenerate(video_id)`.
 
+When the optional provider is installed, `Video.get()` and `Video.getFormats()` automatically detect YouTube's bot-confirmation player response, mint a fresh video-bound token, fetch visitor data, and retry the compatible WEB/MWEB clients. Normal successful requests do not start BotGuard. Explicit `po_token` and `visitor_data` values always take precedence.
+
+```python
+formats = Video.getFormats(video_id)
+```
+
+Automatic fallback can be disabled per call:
+
+```python
+formats = Video.getFormats(video_id, auto_po_token=False)
+```
+
+`BotGuard.resolve(video_id)` and `await BotGuard.aresolve(video_id)` return the provider's full token result when visitor data or cache metadata is needed.
+
 `Video` and `StreamURLFetcher` can also read PO-token values from the environment when explicit arguments are not passed:
 
 ```bash
@@ -115,7 +129,7 @@ export YT_VISITOR_DATA="..."
 
 ## StreamURLFetcher
 
-`StreamURLFetcher` no longer uses yt-dlp. It can process a `Video.getFormats()` result or fetch the format data from a video ID/link itself. PO-token generation and session-aware token caching can be handled separately through the [`ytsp-po-token-provider`](https://github.com/BillaSpace/ytsp-po-token-provider).
+`StreamURLFetcher` no longer uses yt-dlp. It can process a `Video.getFormats()` result or fetch the format data from a video ID/link itself. With the BotGuard extra installed, video ID/link input automatically resolves a video-bound token and applies it to returned stream URLs. PO-token generation and session-aware token caching are owned by the [`ytsp-po-token-provider`](https://github.com/BillaSpace/ytsp-po-token-provider).
 
 ```python
 from youtubesearchpython import StreamURLFetcher

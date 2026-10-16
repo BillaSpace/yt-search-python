@@ -150,8 +150,9 @@ class Video:
         po_token: str = None,
         visitor_data: str = None,
         proxy: str = None,
+        auto_po_token: bool = True,
     ) -> Union[dict, None]:
-        video = VideoCore(videoLink, None, resultMode, timeout, get_upload_date, "ANDROID", po_token, visitor_data, proxy)
+        video = VideoCore(videoLink, None, resultMode, timeout, get_upload_date, "ANDROID", po_token, visitor_data, proxy, auto_po_token)
         if get_upload_date:
             await video.async_html_create()
         await video.async_create()
@@ -159,17 +160,17 @@ class Video:
 
     @staticmethod
     async def getInfo(
-        videoLink: str, resultMode: int = ResultMode.dict, timeout: int = None, po_token: str = None, visitor_data: str = None, proxy: str = None
+        videoLink: str, resultMode: int = ResultMode.dict, timeout: int = None, po_token: str = None, visitor_data: str = None, proxy: str = None, auto_po_token: bool = True
     ) -> Union[dict, None]:
-        video = VideoCore(videoLink, "getInfo", resultMode, timeout, False, po_token=po_token, visitor_data=visitor_data, proxy=proxy)
+        video = VideoCore(videoLink, "getInfo", resultMode, timeout, False, po_token=po_token, visitor_data=visitor_data, proxy=proxy, auto_po_token=auto_po_token)
         await video.async_create()
         return video.result
 
     @staticmethod
     async def getFormats(
-        videoLink: str, resultMode: int = ResultMode.dict, timeout: int = None, po_token: str = None, visitor_data: str = None, proxy: str = None
+        videoLink: str, resultMode: int = ResultMode.dict, timeout: int = None, po_token: str = None, visitor_data: str = None, proxy: str = None, auto_po_token: bool = True
     ) -> Union[dict, None]:
-        video = VideoCore(videoLink, "getFormats", resultMode, timeout, False, po_token=po_token, visitor_data=visitor_data, proxy=proxy)
+        video = VideoCore(videoLink, "getFormats", resultMode, timeout, False, po_token=po_token, visitor_data=visitor_data, proxy=proxy, auto_po_token=auto_po_token)
         await video.async_create()
         return video.result
 
@@ -351,12 +352,24 @@ class Mixes:
 
 
 class StreamURLFetcher(StreamURLFetcherCore):
-    def __init__(self, proxy: str = None, cookies_file: str = None, po_token: str = None, visitor_data: str = None):
+    def __init__(self, proxy: str = None, cookies_file: str = None, po_token: str = None, visitor_data: str = None, auto_po_token: bool = True):
         super().__init__(proxy, cookies_file, po_token, visitor_data)
+        self.auto_po_token = auto_po_token
+        self.attestation_error = None
 
     async def _formats(self, source: Union[dict, str]) -> dict:
         if isinstance(source, dict):
             return source
+        if self.auto_po_token and not self.po_token:
+            try:
+                options = {"timeout": 20}
+                if self.proxy:
+                    options["proxy"] = self.proxy
+                token = await BotGuard.aresolve(get_video_id(source), **options)
+                self.po_token = token.token
+                self.visitor_data = self.visitor_data or token.visitor_data
+            except Exception as error:
+                self.attestation_error = str(error)
         from youtubesearchpython.future.extras import Video
         return await Video.getFormats(source, po_token=self.po_token, visitor_data=self.visitor_data, proxy=self.proxy)
 

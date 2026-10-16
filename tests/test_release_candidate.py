@@ -4,7 +4,7 @@ import os
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
-from unittest.mock import patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
 import psutil
@@ -530,6 +530,40 @@ def test_stream_fetcher_has_no_ytdlp_dependency_and_preserves_direct_urls():
     for stream in result['streams']:
         assert parse_qs(urlsplit(stream['url']).query)['pot'] == ['pot123']
     assert parse_qs(urlsplit(result['streams'][1]['url']).query)['sig'] == ['abc']
+
+
+def test_stream_fetcher_automatically_resolves_video_bound_token(monkeypatch):
+    from types import SimpleNamespace
+
+    from youtubesearchpython.streamurlfetcher import StreamURLFetcher
+
+    formats = {
+        'id': 'abcdefghijk',
+        'streamingData': {'formats': [{'itag': 18, 'url': 'https://rr.example/video'}]},
+    }
+    resolve = Mock(return_value=SimpleNamespace(token='fresh-token', visitor_data='visitor-data'))
+    monkeypatch.setattr('youtubesearchpython.sync.BotGuard.resolve', resolve)
+    monkeypatch.setattr('youtubesearchpython.sync.Video.getFormats', lambda *args, **kwargs: formats)
+
+    fetcher = StreamURLFetcher()
+    result = fetcher.getAll('abcdefghijk')
+
+    resolve.assert_called_once_with('abcdefghijk', timeout=20)
+    assert fetcher.po_token == 'fresh-token'
+    assert fetcher.visitor_data == 'visitor-data'
+    assert 'pot=fresh-token' in result['streams'][0]['url']
+
+
+def test_stream_fetcher_records_attestation_failure(monkeypatch):
+    from youtubesearchpython.streamurlfetcher import StreamURLFetcher
+
+    monkeypatch.setattr('youtubesearchpython.sync.BotGuard.resolve', Mock(side_effect=RuntimeError('provider unavailable')))
+    monkeypatch.setattr('youtubesearchpython.sync.Video.getFormats', lambda *args, **kwargs: {'id': 'abcdefghijk'})
+
+    fetcher = StreamURLFetcher()
+    fetcher.getAll('abcdefghijk')
+
+    assert fetcher.attestation_error == 'provider unavailable'
 
 
 def test_video_player_request_supports_po_token_and_visitor_data():
@@ -1059,8 +1093,106 @@ def test_player_profile_sets_matching_headers_and_clean_payload():
     assert "serviceIntegrityDimensions" not in core.data
 
     core.overridedClient = "WEB"
+    core.visitor_data = "visitor"
     core.prepare_innertube_request()
     assert core.data["serviceIntegrityDimensions"] == {"poToken": "web-token"}
+    assert core.headers["X-Goog-Visitor-Id"] == "visitor"
+
+
+def test_video_automatically_retries_bot_check_with_fresh_web_token(monkeypatch):
+    from types import SimpleNamespace
+
+    from youtubesearchpython.core.video import VideoCore
+
+    class Response:
+        status_code = 200
+
+        def __init__(self, payload):
+            self.payload = payload
+            self.text = json.dumps(payload)
+
+        def json(self):
+            return self.payload
+
+    core = VideoCore("abcdefghijk", "getFormats", ResultMode.dict, 10, False)
+    blocked = {"playabilityStatus": {"status": "LOGIN_REQUIRED", "reason": "Sign in to confirm you’re not a bot"}}
+    playable = {
+        "videoDetails": {"videoId": "abcdefghijk"},
+        "streamingData": {"formats": [{"itag": 18, "url": "https://rr.example/video"}]},
+    }
+    monkeypatch.setattr(core, "syncPostRequest", lambda: Response(playable if core.po_token else blocked))
+    monkeypatch.setattr(core, "_sync_visitor_data", lambda: "visitor-data")
+    resolved = SimpleNamespace(token="fresh-token", visitor_data=None)
+    resolve = Mock(return_value=resolved)
+    monkeypatch.setattr("youtubesearchpython.attestation.BotGuard.resolve", resolve)
+
+    core.sync_create()
+
+    assert core.result["streamingData"]["formats"][0]["itag"] == 18
+    assert core.po_token == "fresh-token"
+    assert core.visitor_data == "visitor-data"
+    resolve.assert_called_once_with("abcdefghijk", bypass_cache=True, timeout=10)
+
+
+def test_video_auto_token_can_be_disabled(monkeypatch):
+    from youtubesearchpython.core.video import VideoCore
+
+    class Response:
+        status_code = 200
+        text = "{}"
+
+        @staticmethod
+        def json():
+            return {"playabilityStatus": {"status": "LOGIN_REQUIRED", "reason": "Sign in to confirm you’re not a bot"}}
+
+    core = VideoCore("abcdefghijk", "getFormats", ResultMode.dict, 10, False, auto_po_token=False)
+    monkeypatch.setattr(core, "syncPostRequest", Response)
+    resolve = Mock()
+    monkeypatch.setattr("youtubesearchpython.attestation.BotGuard.resolve", resolve)
+
+    try:
+        core.sync_create()
+    except Exception:
+        pass
+    else:
+        raise AssertionError("expected format retrieval failure")
+    resolve.assert_not_called()
+
+
+def test_async_video_automatically_retries_bot_check(monkeypatch):
+    from types import SimpleNamespace
+
+    from youtubesearchpython.core.video import VideoCore
+
+    class Response:
+        status_code = 200
+
+        def __init__(self, payload):
+            self.payload = payload
+            self.text = json.dumps(payload)
+
+        def json(self):
+            return self.payload
+
+    core = VideoCore("abcdefghijk", "getFormats", ResultMode.dict, 10, False)
+    blocked = {"playabilityStatus": {"status": "LOGIN_REQUIRED", "reason": "Sign in to confirm you’re not a bot"}}
+    playable = {
+        "videoDetails": {"videoId": "abcdefghijk"},
+        "streamingData": {"formats": [{"itag": 18, "url": "https://rr.example/video"}]},
+    }
+
+    async def request():
+        return Response(playable if core.po_token else blocked)
+
+    monkeypatch.setattr(core, "asyncPostRequest", request)
+    monkeypatch.setattr(core, "_async_visitor_data", AsyncMock(return_value="visitor-data"))
+    resolve = AsyncMock(return_value=SimpleNamespace(token="fresh-token", visitor_data=None))
+    monkeypatch.setattr("youtubesearchpython.attestation.BotGuard.aresolve", resolve)
+
+    asyncio.run(core.async_create())
+
+    assert core.result["streamingData"]["formats"][0]["itag"] == 18
+    resolve.assert_awaited_once_with("abcdefghijk", bypass_cache=True, timeout=10)
 
 
 def test_botguard_public_imports_and_provider_bridge(monkeypatch):
@@ -1073,10 +1205,10 @@ def test_botguard_public_imports_and_provider_bridge(monkeypatch):
         def __init__(self, **options):
             self.options = options
 
-        def get(self, video_id):
+        def get(self, video_id, bypass_cache=False):
             return SimpleNamespace(token=f"sync-{video_id}")
 
-        async def aget(self, video_id):
+        async def aget(self, video_id, bypass_cache=False):
             return SimpleNamespace(token=f"async-{video_id}")
 
     monkeypatch.setattr("ytsp_po_provider.POTokenProvider", Provider)
@@ -1084,3 +1216,5 @@ def test_botguard_public_imports_and_provider_bridge(monkeypatch):
     assert sync_api.BotGuard is async_api.BotGuard
     assert sync_api.BotGuard.generate("abcdefghijk", timeout=5) == "sync-abcdefghijk"
     assert asyncio.run(async_api.BotGuard.agenerate("abcdefghijk", timeout=5)) == "async-abcdefghijk"
+    assert sync_api.BotGuard.resolve("abcdefghijk", timeout=5).token == "sync-abcdefghijk"
+    assert asyncio.run(async_api.BotGuard.aresolve("abcdefghijk", timeout=5)).token == "async-abcdefghijk"

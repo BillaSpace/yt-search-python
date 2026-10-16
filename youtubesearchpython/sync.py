@@ -1,5 +1,6 @@
 from typing import Optional, Union
 
+from youtubesearchpython.attestation import BotGuard
 from youtubesearchpython.core.constants import *
 from youtubesearchpython.core.mixes import MixesCore
 from youtubesearchpython.core.playlist import PlaylistCore
@@ -11,6 +12,7 @@ from youtubesearchpython.core.social import (
     SuggestionsCore,
     TranscriptCore,
 )
+from youtubesearchpython.core.utils import get_video_id
 from youtubesearchpython.core.video import (
     RecommendationsCore,
     StreamURLFetcherCore,
@@ -157,31 +159,31 @@ class CustomSearch(SearchCore):
 
 class Video:
     @staticmethod
-    def get(videoLink: str, mode: int = ResultMode.dict, timeout: int = None, get_upload_date: bool = False, po_token: str = None, visitor_data: str = None, proxy: str = None) -> Union[
+    def get(videoLink: str, mode: int = ResultMode.dict, timeout: int = None, get_upload_date: bool = False, po_token: str = None, visitor_data: str = None, proxy: str = None, auto_po_token: bool = True) -> Union[
         dict, str, None]:
         '''Fetches information and formats for the given video link or ID.
         Returns None if video is unavailable.
         '''
-        videoInternal = VideoCore(videoLink, None, mode, timeout, get_upload_date, po_token=po_token, visitor_data=visitor_data, proxy=proxy)
+        videoInternal = VideoCore(videoLink, None, mode, timeout, get_upload_date, po_token=po_token, visitor_data=visitor_data, proxy=proxy, auto_po_token=auto_po_token)
         if get_upload_date:
             videoInternal.sync_html_create()
         videoInternal.sync_create()
         return videoInternal.result
 
     @staticmethod
-    def getInfo(videoLink: str, mode: int = ResultMode.dict, timeout: int = None, po_token: str = None, visitor_data: str = None, proxy: str = None) -> Union[dict, str, None]:
+    def getInfo(videoLink: str, mode: int = ResultMode.dict, timeout: int = None, po_token: str = None, visitor_data: str = None, proxy: str = None, auto_po_token: bool = True) -> Union[dict, str, None]:
         '''Fetches only metadata (no streaming formats) for the given video link or ID.'''
-        videoInternal = VideoCore(videoLink, "getInfo", mode, timeout, False, po_token=po_token, visitor_data=visitor_data, proxy=proxy)
+        videoInternal = VideoCore(videoLink, "getInfo", mode, timeout, False, po_token=po_token, visitor_data=visitor_data, proxy=proxy, auto_po_token=auto_po_token)
         videoInternal.sync_create()
         return videoInternal.result
 
     @staticmethod
-    def getFormats(videoLink: str, mode: int = ResultMode.dict, timeout: int = None, po_token: str = None, visitor_data: str = None, proxy: str = None) -> Union[
+    def getFormats(videoLink: str, mode: int = ResultMode.dict, timeout: int = None, po_token: str = None, visitor_data: str = None, proxy: str = None, auto_po_token: bool = True) -> Union[
         dict, str, None]:
         '''Fetches only streaming formats for the given video link or ID.
         Returns None if video is unavailable.
         '''
-        videoInternal = VideoCore(videoLink, "getFormats", mode, timeout, False, po_token=po_token, visitor_data=visitor_data, proxy=proxy)
+        videoInternal = VideoCore(videoLink, "getFormats", mode, timeout, False, po_token=po_token, visitor_data=visitor_data, proxy=proxy, auto_po_token=auto_po_token)
         videoInternal.sync_create()
         return videoInternal.result
 
@@ -377,12 +379,24 @@ class Mixes:
 
 
 class StreamURLFetcher(StreamURLFetcherCore):
-    def __init__(self, proxy: str = None, cookies_file: str = None, po_token: str = None, visitor_data: str = None):
+    def __init__(self, proxy: str = None, cookies_file: str = None, po_token: str = None, visitor_data: str = None, auto_po_token: bool = True):
         super().__init__(proxy, cookies_file, po_token, visitor_data)
+        self.auto_po_token = auto_po_token
+        self.attestation_error = None
 
     def _formats(self, source: Union[dict, str]) -> dict:
         if isinstance(source, dict):
             return source
+        if self.auto_po_token and not self.po_token:
+            try:
+                options = {"timeout": 20}
+                if self.proxy:
+                    options["proxy"] = self.proxy
+                token = BotGuard.resolve(get_video_id(source), **options)
+                self.po_token = token.token
+                self.visitor_data = self.visitor_data or token.visitor_data
+            except Exception as error:
+                self.attestation_error = str(error)
         from youtubesearchpython.extras import Video
         return Video.getFormats(source, po_token=self.po_token, visitor_data=self.visitor_data, proxy=self.proxy)
 

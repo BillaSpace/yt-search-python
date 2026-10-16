@@ -38,6 +38,8 @@ info = Video.getInfo("pnxL4OOzPEc")
 formats = Video.getFormats("pnxL4OOzPEc", po_token="TOKEN", visitor_data="VISITOR_DATA")
 ```
 
+With `yt-search-python[botguard]` installed, video APIs automatically retry bot-confirmation responses with a fresh video-bound token. Pass `auto_po_token=False` to disable this fallback. Explicit token and visitor values take precedence.
+
 ## StreamURLFetcher
 
 ```python
@@ -46,6 +48,8 @@ from youtubesearchpython import StreamURLFetcher
 fetcher = StreamURLFetcher(po_token="TOKEN", visitor_data="VISITOR_DATA")
 result = fetcher.getAll("pnxL4OOzPEc")
 ```
+
+When no explicit token is supplied and the BotGuard extra is installed, video ID/link input automatically resolves and applies a video-bound token.
 
 The stream fetcher does not depend on yt-dlp. It returns direct/already-signed formats and reports encrypted player-JavaScript formats under `unresolved` instead of fabricating a working URL.
 

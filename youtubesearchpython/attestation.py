@@ -8,9 +8,17 @@ class BotGuard:
         return POTokenProvider(**options)
 
     @classmethod
-    def generate(cls, video_id: str, **options) -> str:
-        return cls._provider(**options).get(video_id=video_id).token
+    def generate(cls, video_id: str, bypass_cache: bool = False, **options) -> str:
+        return cls.resolve(video_id, bypass_cache=bypass_cache, **options).token
 
     @classmethod
-    async def agenerate(cls, video_id: str, **options) -> str:
-        return (await cls._provider(**options).aget(video_id=video_id)).token
+    async def agenerate(cls, video_id: str, bypass_cache: bool = False, **options) -> str:
+        return (await cls.aresolve(video_id, bypass_cache=bypass_cache, **options)).token
+
+    @classmethod
+    def resolve(cls, video_id: str, bypass_cache: bool = False, **options):
+        return cls._provider(**options).get(video_id=video_id, bypass_cache=bypass_cache)
+
+    @classmethod
+    async def aresolve(cls, video_id: str, bypass_cache: bool = False, **options):
+        return await cls._provider(**options).aget(video_id=video_id, bypass_cache=bypass_cache)

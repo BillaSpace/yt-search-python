@@ -6,6 +6,9 @@
 - Preserved all sync, async, and legacy import paths while fixing legacy transport initialization.
 - Parsed durations and metadata from the current recommendation lockup response shape.
 - Added optional BotGuard-backed PO-token integration through the companion provider.
+- Added lazy automatic BotGuard fallback for bot-confirmation player responses in sync and async video APIs.
+- Scoped generated web tokens to WEB/MWEB retries and kept successful Android-family requests token-free.
+- Added automatic video-bound token application when `StreamURLFetcher` receives a video ID or URL.
 - Added the global sync and async `Mixes` API with video ID, video URL, and `RD...` mix input support.
 - Normalized `Mixes` items to the same field contract as `Recommendations` while preserving YouTube's order.
 

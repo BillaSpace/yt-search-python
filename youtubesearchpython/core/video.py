@@ -85,7 +85,7 @@ CLIENTS["MWEB"].update(client_code="2", user_agent=userAgent)
 CLIENTS["TV_EMBED"].update(client_code="85", user_agent=userAgent)
 
 class VideoCore(RequestCore):
-    def __init__(self, videoLink: str, componentMode: str, resultMode: int, timeout: Optional[int], enableHTML: bool, overridedClient: str = "ANDROID", po_token: str = None, visitor_data: str = None, proxy: str = None):
+    def __init__(self, videoLink: str, componentMode: str, resultMode: int, timeout: Optional[int], enableHTML: bool, overridedClient: str = "ANDROID", po_token: str = None, visitor_data: str = None, proxy: str = None, auto_po_token: bool = True):
         super().__init__(timeout=timeout)
         self.resultMode = resultMode
         self.componentMode = componentMode
@@ -94,6 +94,8 @@ class VideoCore(RequestCore):
         self.overridedClient = overridedClient
         self.po_token, self.visitor_data = get_env_auth(po_token, visitor_data)
         self.proxy = proxy
+        self.auto_po_token = auto_po_token
+        self.attestation_error = None
         self.HTMLresponseSource = {}
 
     def post_request_only_html_processing(self):
@@ -127,8 +129,83 @@ class VideoCore(RequestCore):
         client = self.data.setdefault("context", {}).setdefault("client", {})
         if self.visitor_data:
             client["visitorData"] = self.visitor_data
+            self.headers["X-Goog-Visitor-Id"] = self.visitor_data
         if self.po_token and self.overridedClient in {"WEB", "MWEB"}:
             self.data["serviceIntegrityDimensions"] = {"poToken": self.po_token}
+
+    @staticmethod
+    def _requires_attestation(source: dict) -> bool:
+        status = (source.get("playabilityStatus") or {}).get("status")
+        reason = str((source.get("playabilityStatus") or {}).get("reason") or "").lower()
+        return status == "LOGIN_REQUIRED" and "not a bot" in reason
+
+    def _visitor_request(self) -> RequestCore:
+        request = RequestCore(self.timeout)
+        request.proxy = self.proxy
+        request.url = "https://www.youtube.com/youtubei/v1/visitor_id?" + urlencode({"key": searchKey})
+        profile = CLIENTS["WEB"]
+        request.data = request.buildInnertubeBody(client={
+            "hl": "en",
+            "gl": "US",
+            "clientName": "WEB",
+            "clientVersion": profile["context"]["client"]["clientVersion"],
+        })
+        request.headers = {
+            "User-Agent": profile["user_agent"],
+            "X-YouTube-Client-Name": profile["client_code"],
+            "X-YouTube-Client-Version": profile["context"]["client"]["clientVersion"],
+        }
+        return request
+
+    def _sync_visitor_data(self) -> Optional[str]:
+        response = self._visitor_request().syncPostRequest()
+        if response.status_code != 200:
+            return None
+        return (response.json().get("responseContext") or {}).get("visitorData")
+
+    async def _async_visitor_data(self) -> Optional[str]:
+        response = await self._visitor_request().asyncPostRequest()
+        if response.status_code != 200:
+            return None
+        return (response.json().get("responseContext") or {}).get("visitorData")
+
+    def _sync_auto_attestation(self) -> bool:
+        if self.po_token or not self.auto_po_token:
+            return False
+        try:
+            from youtubesearchpython.attestation import BotGuard
+
+            if not self.visitor_data:
+                self.visitor_data = self._sync_visitor_data()
+            options = {"timeout": self.timeout}
+            if self.proxy:
+                options["proxy"] = self.proxy
+            token = BotGuard.resolve(getVideoId(self.videoLink), bypass_cache=True, **options)
+            self.po_token = token.token
+            self.visitor_data = self.visitor_data or token.visitor_data
+            return bool(self.po_token)
+        except Exception as error:
+            self.attestation_error = str(error)
+            return False
+
+    async def _async_auto_attestation(self) -> bool:
+        if self.po_token or not self.auto_po_token:
+            return False
+        try:
+            from youtubesearchpython.attestation import BotGuard
+
+            if not self.visitor_data:
+                self.visitor_data = await self._async_visitor_data()
+            options = {"timeout": self.timeout}
+            if self.proxy:
+                options["proxy"] = self.proxy
+            token = await BotGuard.aresolve(getVideoId(self.videoLink), bypass_cache=True, **options)
+            self.po_token = token.token
+            self.visitor_data = self.visitor_data or token.visitor_data
+            return bool(self.po_token)
+        except Exception as error:
+            self.attestation_error = str(error)
+            return False
 
     @staticmethod
     def _streaming_score(source: dict) -> int:
@@ -142,6 +219,7 @@ class VideoCore(RequestCore):
         best_response = None
         best_source = None
         best_score = -1
+        attestation_required = False
         clients = ["ANDROID_VR", "ANDROID", "WEB", "MWEB", "TV_EMBED"]
         for client in clients:
             self.overridedClient = client
@@ -153,6 +231,7 @@ class VideoCore(RequestCore):
                 source = response.json()
             except Exception:
                 continue
+            attestation_required = attestation_required or self._requires_attestation(source)
             if "videoDetails" not in source:
                 continue
             if self.componentMode == "getInfo":
@@ -166,6 +245,24 @@ class VideoCore(RequestCore):
                 best_response, best_source, best_score = response.text, source, score
             if score >= 1000:
                 break
+        if best_score <= 0 and attestation_required and await self._async_auto_attestation():
+            for client in ["WEB", "MWEB"]:
+                self.overridedClient = client
+                self.prepare_innertube_request()
+                response = await self.asyncPostRequest()
+                if response is None or response.status_code != 200:
+                    continue
+                try:
+                    source = response.json()
+                except Exception:
+                    continue
+                if "videoDetails" not in source:
+                    continue
+                score = self._streaming_score(source)
+                if score > best_score:
+                    best_response, best_source, best_score = response.text, source, score
+                if score >= 1000:
+                    break
         if best_source is not None and (self.componentMode != "getFormats" or best_score > 0):
             self.response = best_response
             self.responseSource = best_source
@@ -189,6 +286,7 @@ class VideoCore(RequestCore):
         best_response = None
         best_source = None
         best_score = -1
+        attestation_required = False
         clients = ["ANDROID_VR", "ANDROID", "WEB", "MWEB", "TV_EMBED"]
         for client in clients:
             self.overridedClient = client
@@ -200,6 +298,7 @@ class VideoCore(RequestCore):
                 source = response.json()
             except Exception:
                 continue
+            attestation_required = attestation_required or self._requires_attestation(source)
             if "videoDetails" not in source:
                 continue
             if self.componentMode == "getInfo":
@@ -213,6 +312,24 @@ class VideoCore(RequestCore):
                 best_response, best_source, best_score = response.text, source, score
             if score >= 1000:
                 break
+        if best_score <= 0 and attestation_required and self._sync_auto_attestation():
+            for client in ["WEB", "MWEB"]:
+                self.overridedClient = client
+                self.prepare_innertube_request()
+                response = self.syncPostRequest()
+                if response is None or response.status_code != 200:
+                    continue
+                try:
+                    source = response.json()
+                except Exception:
+                    continue
+                if "videoDetails" not in source:
+                    continue
+                score = self._streaming_score(source)
+                if score > best_score:
+                    best_response, best_source, best_score = response.text, source, score
+                if score >= 1000:
+                    break
         if best_source is not None and (self.componentMode != "getFormats" or best_score > 0):
             self.response = best_response
             self.responseSource = best_source
