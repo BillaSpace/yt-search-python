@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://pypi.org/project/yt-search-python/">
-    <img src="https://img.shields.io/pypi/v/yt-search-python?label=PyPI&cacheSeconds=60" alt="PyPI">
+    <img src="https://img.shields.io/pypi/v/yt-search-python?label=PyPI&cacheSeconds=30" alt="PyPI">
   </a>
   <img src="https://img.shields.io/pypi/pyversions/yt-search-python?cacheSeconds=60" alt="Python versions">
   <a href="https://github.com/BillaSpace/yt-search-python/blob/legacy/LICENSE">
